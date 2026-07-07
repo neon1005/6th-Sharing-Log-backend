@@ -5,6 +5,6 @@ spring:
         registration:
           google:
             # 깃허브, 외부사이트, AI 등 절대 외부 유출 금지
-            # 환경 변수로 설정해둠 powershell ..
+            # 환경 변수로 설정
             client-id: ${GOOGLE_CLIENT_ID}
             client-secret: ${GOOGLE_CLIENT_SECRET}

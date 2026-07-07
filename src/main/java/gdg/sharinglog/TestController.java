@@ -1,5 +1,5 @@
 package gdg.sharinglog;
 
 public class TestController {
-    String test;
+    String test; // 테스트
 }

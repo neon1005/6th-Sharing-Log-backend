@@ -15,6 +15,7 @@ import gdg.sharinglog.domain.SharingGroup;
 import gdg.sharinglog.domain.User;
 import gdg.sharinglog.domain.rotation.Chore;
 import gdg.sharinglog.domain.rotation.ChoreOccurrence;
+import gdg.sharinglog.domain.rotation.OccurrenceStatus;
 import gdg.sharinglog.repository.rotation.ChoreAssignmentAttemptRepository;
 import gdg.sharinglog.repository.rotation.ChoreOccurrenceRepository;
 import gdg.sharinglog.service.rotation.access.RotationActor;
@@ -90,5 +91,43 @@ class OccurrenceQueryServiceTest {
 
         assertEquals(List.of(activeResponse), response.items());
         verify(viewMapper, never()).occurrence(inactiveOccurrence, actor);
+    }
+
+    @Test
+    void findDueSoonReturnsCallersAssignedOccurrencesOrderedByRepository() {
+        String groupPublicId = "group-public-id";
+        OAuth2User principal = mock(OAuth2User.class);
+        SharingGroup group = mock(SharingGroup.class);
+        GroupMember membership = mock(GroupMember.class);
+        User user = mock(User.class);
+        RotationActor actor = new RotationActor(group, membership, user);
+        ChoreOccurrence soonest = mock(ChoreOccurrence.class);
+        ChoreOccurrence later = mock(ChoreOccurrence.class);
+        OccurrenceSummaryResponse soonestResponse = mock(OccurrenceSummaryResponse.class);
+        OccurrenceSummaryResponse laterResponse = mock(OccurrenceSummaryResponse.class);
+
+        when(accessService.requireActiveMember(
+                groupPublicId,
+                "google",
+                principal
+        )).thenReturn(actor);
+        when(group.getId()).thenReturn(1L);
+        when(group.getPublicId()).thenReturn(groupPublicId);
+        when(group.getTimeZoneId()).thenReturn("Asia/Seoul");
+        when(group.timeZone()).thenReturn(java.time.ZoneId.of("Asia/Seoul"));
+        when(membership.getId()).thenReturn(2L);
+        when(occurrenceRepository
+                .findAllByChore_Group_IdAndStatusAndCurrentAssignment_Assignee_IdOrderByDueAtAsc(
+                        1L,
+                        OccurrenceStatus.ASSIGNED,
+                        2L
+                ))
+                .thenReturn(List.of(soonest, later));
+        when(viewMapper.occurrence(soonest, actor)).thenReturn(soonestResponse);
+        when(viewMapper.occurrence(later, actor)).thenReturn(laterResponse);
+
+        var response = service.findDueSoon(groupPublicId, "google", principal);
+
+        assertEquals(List.of(soonestResponse, laterResponse), response.items());
     }
 }

@@ -139,4 +139,17 @@ public interface ChoreOccurrenceRepository extends JpaRepository<ChoreOccurrence
             Long groupId,
             OccurrenceStatus status
     );
+
+    @EntityGraph(attributePaths = {
+            "chore",
+            "currentAssignment",
+            "currentAssignment.assignee",
+            "currentAssignment.assignee.user"
+    })
+    List<ChoreOccurrence>
+    findAllByChore_Group_IdAndStatusAndCurrentAssignment_Assignee_IdOrderByDueAtAsc(
+            Long groupId,
+            OccurrenceStatus status,
+            Long membershipId
+    );
 }

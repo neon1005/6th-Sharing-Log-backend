@@ -94,6 +94,18 @@ public class RotationOccurrenceController {
         );
     }
 
+    @GetMapping("/due-soon")        // 마감 임박
+    public OccurrenceListResponse dueSoon(
+            @PathVariable String groupId,
+            OAuth2AuthenticationToken authentication
+    ) {
+        return queryService.findDueSoon(
+                groupId,
+                authentication.getAuthorizedClientRegistrationId(),
+                authentication.getPrincipal()
+        );
+    }
+
     @GetMapping("/completed-history")
     public CompletedOccurrenceHistoryResponse completedHistory(
             @PathVariable String groupId,

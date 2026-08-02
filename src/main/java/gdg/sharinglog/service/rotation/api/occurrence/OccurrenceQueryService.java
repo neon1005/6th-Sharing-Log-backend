@@ -74,6 +74,33 @@ public class OccurrenceQueryService {
     }
 
     @Transactional(readOnly = true)
+    public OccurrenceListResponse findDueSoon(
+            String groupPublicId,
+            String registrationId,
+            OAuth2User principal
+    ) {
+        RotationActor actor =
+                accessService.requireActiveMember(groupPublicId, registrationId, principal);
+        List<ChoreOccurrence> occurrences = occurrenceRepository
+                .findAllByChore_Group_IdAndStatusAndCurrentAssignment_Assignee_IdOrderByDueAtAsc(
+                        actor.group().getId(),
+                        OccurrenceStatus.ASSIGNED,
+                        actor.membership().getId()
+                );
+        return new OccurrenceListResponse(
+                actor.group().getPublicId(),
+                null,
+                new OccurrenceListResponse.QueryResponse(
+                        LocalDate.now(actor.group().timeZone()),
+                        actor.group().getTimeZoneId()
+                ),
+                occurrences.stream().map(item -> viewMapper.occurrence(item, actor)).toList(),
+                null,
+                false
+        );
+    }
+
+    @Transactional(readOnly = true)
     public CompletedOccurrenceHistoryResponse findCompletedHistory(
             String groupPublicId,
             String registrationId,

@@ -1,3 +1,13 @@
+## 개발 이슈들
+
+현재 기능 임시 보관 (예: 로그인 수정)
+git stash push -m "oauth error fix"
+
+최신 PR이 반영된 기준 브랜치로 이동, 최신화
+git fetch origin
+git switch develop
+
+
 ## Google 로그인 실행 방법
 
 Google Cloud Console에서 OAuth 2.0 Client ID를 만들고 승인된 리디렉션 URI에 아래 주소를 등록합니다.

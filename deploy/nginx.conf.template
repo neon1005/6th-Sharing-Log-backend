@@ -1,0 +1,65 @@
+# DEPLOY.md 4단계 이전까지는 아직 인증서가 없으므로, 처음엔 80포트 블록만 활성화해서 certbot으로
+# 인증서부터 받은 뒤(8단계), certbot이 이 파일에 443 블록과 ssl_certificate 줄을 자동으로 추가해준다.
+# <SSLIP_HOST> 자리를 실제 호스트네임(예: 3-35-12-34.sslip.io)으로 바꿔서 사용할 것.
+
+server {
+    listen 80;
+    server_name <SSLIP_HOST>;
+
+    location / {
+        root /var/www/frontend;
+        try_files $uri /index.html;
+    }
+
+    # 백엔드로 넘겨야 하는 경로들: REST API, 구글 로그인 시작/콜백
+    location /api/ {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    location /oauth2/ {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    location /login/oauth2/ {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    # 초대 미리보기와 가입 POST는 Spring Security의 saved request 및
+    # 서버 렌더링 가입 화면을 사용하므로 백엔드로 전달한다.
+    location /invite/ {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    # 로그인 안 된 상태에서 보호된 경로에 접근하면 Spring Security가 이리로 리다이렉트한다.
+    location = /login {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    # /login, /invite/{code} 같은 백엔드 렌더링 페이지가 쓰는 정적 리소스
+    location /css/ {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /js/ {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}

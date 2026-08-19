@@ -1,0 +1,10 @@
+services:
+  backend:
+    build: .
+    restart: unless-stopped
+    # 외부에는 노출하지 않고 로컬호스트(127.0.0.1)에만 열어서, Nginx만 접근하고
+    # 인터넷에서 8080으로 직접 백엔드에 붙는 걸 막는다. 실제 인터넷 노출은 Nginx(80/443)만 담당.
+    ports:
+      - "127.0.0.1:8080:8080"
+    env_file:
+      - .env

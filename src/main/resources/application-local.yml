@@ -1,0 +1,18 @@
+spring:
+  config:
+    activate:
+      on-profile: local
+
+app:
+  frontend-origin: http://localhost:8080
+  public-base-url: ""
+  oauth2-success-url: /
+  oauth2-failure-url: /login?error=true
+
+server:
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        secure: false
+        same-site: lax

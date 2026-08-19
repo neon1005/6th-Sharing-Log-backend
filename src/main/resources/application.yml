@@ -1,0 +1,83 @@
+spring:
+  datasource:
+    # 빈스토크 환경변수에 등록됨
+    url: "${SPRING_DATASOURCE_URL:jdbc:h2:mem:sharinglog;MODE=MySQL;DB_CLOSE_DELAY=-1}"
+    username: "${SPRING_DATASOURCE_USERNAME:sa}"
+    password: "${SPRING_DATASOURCE_PASSWORD:}"
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    # 전송 쿼리 확인
+
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+    # 테이블 생성 후에 data.sql 실행
+  flyway:
+    enabled: true
+    locations: "classpath:db/migration/{vendor}"
+    baseline-on-migrate: false
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            # 깃허브, 외부사이트, AI 등 절대 외부 유출 금지
+            # 인텔리제이 환경 변수로 설정함
+            # powershell 에서도 $ens 로 환경변수 만졌지만, 이 방법은 실패함
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope:
+              - openid
+              - profile
+              - email
+          naver:
+            client-id: ${NAVER_CLIENT_ID}
+            client-secret: ${NAVER_CLIENT_SECRET}
+            client-authentication-method: client_secret_post
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            client-name: Naver
+
+        provider:
+          naver:
+            authorization-uri: https://nid.naver.com/oauth2.0/authorize
+            token-uri: https://nid.naver.com/oauth2.0/token
+            user-info-uri: https://openapi.naver.com/v1/nid/me
+            user-name-attribute: response
+
+sharing-log:
+  rotation:
+    scheduler:
+      cron: "0 5 * * * *"
+
+cloud:
+  aws:
+    region: ${AWS_REGION:ap-northeast-2}
+
+app:
+  frontend-origin: "${APP_FRONTEND_ORIGIN:${APP_FRONTEND_BASE_URL:http://localhost:8080}}"
+  public-base-url: "${APP_PUBLIC_BASE_URL:}"
+  oauth2-success-url: "${APP_OAUTH2_SUCCESS_URL:}"
+  oauth2-failure-url: "${APP_OAUTH2_FAILURE_URL:}"
+  push:
+    vapid-public-key: "${APP_PUSH_VAPID_PUBLIC_KEY:}"
+    vapid-private-key: "${APP_PUSH_VAPID_PRIVATE_KEY:}"
+    vapid-subject: "${APP_PUSH_VAPID_SUBJECT:mailto:noreply@example.com}"
+
+server:
+  port: ${SERVER_PORT:8080}
+  forward-headers-strategy: framework
+  servlet:
+    session:
+      cookie:
+        # Local development serves the temporary UI and API from localhost:8080.
+        # Cross-site production deployments must override these values with
+        # SESSION_COOKIE_SECURE=true and SESSION_COOKIE_SAME_SITE=none.
+        http-only: true
+        secure: ${SESSION_COOKIE_SECURE:false}
+        same-site: ${SESSION_COOKIE_SAME_SITE:lax}

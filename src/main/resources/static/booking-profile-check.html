@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>예약·프로필 API 임시 확인</title>
+    <script src="/js/booking-profile-check.js" defer></script>
+    <script src="/js/logout.js" defer></script>
+</head>
+<body>
+<main>
+    <h1>예약·프로필 API 임시 확인</h1>
+    <p>로그인한 상태에서 백엔드 API를 직접 호출하는 디자인 없는 확인 화면입니다.</p>
+    <p>
+        <a href="/">홈으로</a>
+        <button id="logout-button" type="button" aria-describedby="logout-status">로그아웃</button>
+    </p>
+    <p id="logout-status" role="status" aria-live="polite"></p>
+
+    <hr>
+    <section aria-labelledby="profile-heading">
+        <h2 id="profile-heading">내 프로필</h2>
+        <button id="load-profile-button" type="button">프로필 조회</button>
+        <dl>
+            <dt>이메일</dt>
+            <dd id="profile-email">-</dd>
+            <dt>닉네임</dt>
+            <dd id="profile-nickname">-</dd>
+        </dl>
+        <form id="nickname-form">
+            <label for="nickname">새 닉네임 (1~20자)</label>
+            <input id="nickname" name="nickname" type="text" minlength="1" maxlength="20" required>
+            <button type="submit">닉네임 변경</button>
+        </form>
+        <pre id="profile-result" role="status" aria-live="polite"></pre>
+    </section>
+
+    <hr>
+    <section aria-labelledby="space-heading">
+        <h2 id="space-heading">공용 공간</h2>
+        <p>그룹 생성 결과의 <strong>공개 그룹 ID</strong>(로테이션에서 사용하는 UUID)를 입력하세요.</p>
+        <form id="space-list-form">
+            <label for="group-id">공개 그룹 ID</label>
+            <input id="group-id" name="groupId" type="text" autocomplete="off" required>
+            <button type="submit">공간 조회</button>
+        </form>
+        <form id="space-create-form">
+            <label for="space-name">새 공간 이름</label>
+            <input id="space-name" name="name" type="text" maxlength="50" autocomplete="off" required>
+            <button type="submit">공간 추가</button>
+        </form>
+        <ul id="space-list"></ul>
+        <pre id="space-result" role="status" aria-live="polite"></pre>
+    </section>
+
+    <hr>
+    <section aria-labelledby="reservation-heading">
+        <h2 id="reservation-heading">공간 예약</h2>
+        <p>
+            <label for="space-id">공간</label>
+            <select id="space-id" disabled required>
+                <option value="">먼저 공간을 조회하세요</option>
+            </select>
+        </p>
+        <form id="reservation-list-form">
+            <label for="reservation-date">날짜</label>
+            <input id="reservation-date" name="date" type="date" required>
+            <button type="submit">예약 현황 조회</button>
+        </form>
+        <form id="reservation-create-form">
+            <label for="start-time">시작 시간</label>
+            <input id="start-time" name="startTime" type="time" value="09:00" required>
+            <label for="end-time">종료 시간</label>
+            <input id="end-time" name="endTime" type="time" value="10:00" required>
+            <button type="submit">예약 생성</button>
+        </form>
+
+        <table border="1">
+            <thead>
+            <tr>
+                <th>예약 ID</th>
+                <th>시간</th>
+                <th>예약자</th>
+                <th>상태</th>
+                <th>버전</th>
+                <th>작업</th>
+            </tr>
+            </thead>
+            <tbody id="reservation-list">
+            <tr><td colspan="6">공간과 날짜를 선택해 조회하세요.</td></tr>
+            </tbody>
+        </table>
+        <pre id="reservation-action-result" role="status" aria-live="polite"></pre>
+        <details>
+            <summary>최근 예약 조회 원본 응답</summary>
+            <pre id="reservation-result"></pre>
+        </details>
+    </section>
+</main>
+</body>
+</html>

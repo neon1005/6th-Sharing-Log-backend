@@ -1,2 +1,4 @@
-# 6th-Sharing-Log-backend
-공동 생활 관리 서비스 Sharing Log 백엔드 개발 파트
+공동 생활 관리 서비스 '같이 살기' 백엔드 개발 파트 
+
+프로젝트명  Sharing Log  
+서비스 명 '같이 살기'

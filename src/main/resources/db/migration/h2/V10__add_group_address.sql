@@ -1,0 +1,1 @@
+ALTER TABLE sharing_groups ADD COLUMN address VARCHAR(255);

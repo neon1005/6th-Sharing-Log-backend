@@ -1,0 +1,101 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.1.0'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'gdg'
+version = '0.0.1-SNAPSHOT'
+description = 'sharingLog'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25) // 일래스틱 빈스토크 자바 버전 맞추기
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-flyway'
+    runtimeOnly 'org.flywaydb:flyway-mysql'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    runtimeOnly 'com.h2database:h2' // 인메모리 데이터베이스
+
+    implementation 'com.mysql:mysql-connector-j' // 아마존 서버에서 mySQL 사용하므로 프로젝트 빌드해 배포하기전 의존성 추가
+
+    implementation 'software.amazon.awssdk:s3:2.41.31' // S3 의존성 추가
+
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3' // swagger
+
+    implementation 'nl.martijndwars:web-push:5.1.1' // Web Push(VAPID) 전송
+    implementation 'org.bouncycastle:bcprov-jdk18on:1.84' // web-push가 사용하는 EC 암호화 provider
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+def bootJarTask = tasks.named('bootJar')
+
+tasks.register('ebBundle', Zip) {
+    group = 'distribution'
+    description = 'Builds an Elastic Beanstalk source bundle with application.jar and .platform hooks.'
+    dependsOn bootJarTask
+
+    archiveFileName = "${project.name}-${project.version}-eb.zip"
+    destinationDirectory = layout.buildDirectory.dir('distributions')
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+
+    from(bootJarTask.flatMap { it.archiveFile }) {
+        rename { 'application.jar' }
+    }
+
+    from(layout.projectDirectory.dir('.platform')) {
+        into '.platform'
+    }
+
+    doLast {
+        def bundleFile = archiveFile.get().asFile
+        def entries = [] as Set
+
+        project.zipTree(bundleFile).visit { details ->
+            if (!details.directory) {
+                entries << details.relativePath.pathString
+            }
+        }
+
+        def requiredEntries = [
+                'application.jar',
+                '.platform/hooks/postdeploy/50-configure-certbot.sh',
+                '.platform/confighooks/postdeploy/50-configure-certbot.sh',
+                '.platform/scripts/configure-certbot.sh',
+                '.platform/nginx/conf.d/elasticbeanstalk/00-acme-challenge.conf'
+        ]
+        def missingEntries = requiredEntries.findAll { !entries.contains(it) }
+
+        if (!missingEntries.isEmpty()) {
+            throw new GradleException("Elastic Beanstalk bundle is missing: ${missingEntries.join(', ')}")
+        }
+
+        logger.lifecycle("Elastic Beanstalk bundle verified: ${bundleFile}")
+    }
+}

@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>업무 로테이션 · Sharing Log</title>
+    <link rel="stylesheet" href="/css/app.css">
+    <script src="/js/rotation.js" defer></script>
+    <script src="/js/booking-profile-check.js" defer></script>
+    <script src="/js/logout.js" defer></script>
+</head>
+<body class="rotation-page">
+<main class="rotation-shell">
+    <header class="rotation-header">
+        <div>
+            <p class="eyebrow">Sharing Log</p>
+            <h1>업무 로테이션</h1>
+            <p class="copy">공정성 점수가 같은 후보 사이에서만 무작위로 담당자를 정해요.</p>
+        </div>
+        <div class="rotation-header-actions">
+            <button id="open-booking-profile" class="secondary-button" type="button">
+                공간 예약·프로필
+            </button>
+            <button id="open-notifications" class="secondary-button notification-button" type="button">
+                알림
+                <span id="notification-count" class="notification-count" aria-label="알림 대상 0건">0</span>
+            </button>
+            <button id="open-completed-history" class="secondary-button" type="button">
+                완료 이력
+            </button>
+            <button id="open-substitute-requests" class="secondary-button" type="button">
+                대타 요청함
+            </button>
+            <button id="open-manage-rotation" class="secondary-button" type="button" hidden>
+                로테이션 관리
+            </button>
+            <button id="open-create-chore" class="primary-button" type="button">업무 추가</button>
+            <button id="logout-button"
+                    class="danger-outline-button"
+                    type="button"
+                    aria-describedby="logout-status">로그아웃</button>
+        </div>
+    </header>
+    <p id="logout-status" class="rotation-status" role="status" aria-live="polite"></p>
+
+    <nav class="rotation-tabs" aria-label="반복 주기">
+        <button class="rotation-tab is-active" data-frequency="DAILY" type="button">매일</button>
+        <button class="rotation-tab" data-frequency="WEEKLY" type="button">매주</button>
+        <button class="rotation-tab" data-frequency="BIWEEKLY" type="button">격주</button>
+    </nav>
+
+    <p id="rotation-status" class="rotation-status" role="status" aria-live="polite"></p>
+    <section id="occurrence-list" class="occurrence-grid"></section>
+
+    <dialog id="booking-profile-dialog"
+            class="rotation-dialog rotation-dialog-wide"
+            aria-labelledby="booking-profile-title">
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">API CHECK</p>
+                <h2 id="booking-profile-title">공간 예약·프로필 확인</h2>
+            </div>
+            <button id="close-booking-profile" class="icon-button" type="button" aria-label="닫기">×</button>
+        </div>
+
+        <section aria-labelledby="profile-heading">
+            <h3 id="profile-heading">내 프로필</h3>
+            <button id="load-profile-button" class="secondary-button" type="button">프로필 조회</button>
+            <dl>
+                <dt>이메일</dt>
+                <dd id="profile-email">-</dd>
+                <dt>닉네임</dt>
+                <dd id="profile-nickname">-</dd>
+            </dl>
+            <form id="nickname-form">
+                <label for="nickname">새 닉네임 (1~20자)</label>
+                <input id="nickname" name="nickname" type="text" minlength="1" maxlength="20" required>
+                <button class="primary-button" type="submit">닉네임 변경</button>
+            </form>
+            <pre id="profile-result" role="status" aria-live="polite"></pre>
+        </section>
+
+        <hr class="dialog-divider">
+        <section aria-labelledby="space-heading">
+            <h3 id="space-heading">공용 공간</h3>
+            <form id="space-list-form">
+                <label for="group-id">공개 그룹 ID</label>
+                <input id="group-id" name="groupId" type="text" autocomplete="off" readonly required>
+                <button class="secondary-button" type="submit">공간 조회</button>
+            </form>
+            <form id="space-create-form">
+                <label for="space-name">새 공간 이름</label>
+                <input id="space-name" name="name" type="text" maxlength="50" autocomplete="off" required>
+                <button class="primary-button" type="submit">공간 추가</button>
+            </form>
+            <ul id="space-list"></ul>
+            <pre id="space-result" role="status" aria-live="polite"></pre>
+        </section>
+
+        <hr class="dialog-divider">
+        <section aria-labelledby="reservation-heading">
+            <h3 id="reservation-heading">공간 예약</h3>
+            <p>
+                <label for="space-id">공간</label>
+                <select id="space-id" disabled required>
+                    <option value="">공간을 불러오는 중입니다</option>
+                </select>
+            </p>
+            <form id="reservation-list-form">
+                <label for="reservation-date">날짜</label>
+                <input id="reservation-date" name="date" type="date" required>
+                <button class="secondary-button" type="submit">예약 현황 조회</button>
+            </form>
+            <form id="reservation-create-form">
+                <label for="start-time">시작 시간</label>
+                <input id="start-time" name="startTime" type="time" value="09:00" required>
+                <label for="end-time">종료 시간</label>
+                <input id="end-time" name="endTime" type="time" value="10:00" required>
+                <button class="primary-button" type="submit">예약 생성</button>
+            </form>
+
+            <table border="1">
+                <thead>
+                <tr>
+                    <th>예약 ID</th>
+                    <th>시간</th>
+                    <th>예약자</th>
+                    <th>상태</th>
+                    <th>버전</th>
+                    <th>작업</th>
+                </tr>
+                </thead>
+                <tbody id="reservation-list">
+                <tr><td colspan="6">공간과 날짜를 선택해 조회하세요.</td></tr>
+                </tbody>
+            </table>
+            <pre id="reservation-action-result" role="status" aria-live="polite"></pre>
+            <details>
+                <summary>최근 예약 조회 원본 응답</summary>
+                <pre id="reservation-result"></pre>
+            </details>
+        </section>
+    </dialog>
+
+    <dialog id="create-chore-dialog" class="rotation-dialog">
+        <form id="create-chore-form">
+            <div class="dialog-heading">
+                <div>
+                    <p class="eyebrow">NEW CHORE</p>
+                    <h2>새 업무 만들기</h2>
+                </div>
+                <button id="close-create-chore" class="icon-button" type="button" aria-label="닫기">×</button>
+            </div>
+            <label>업무 이름
+                <input id="chore-name" maxlength="100" required>
+            </label>
+            <label>반복
+                <select id="chore-frequency">
+                    <option value="DAILY">매일</option>
+                    <option value="WEEKLY">매주</option>
+                    <option value="BIWEEKLY">격주</option>
+                </select>
+            </label>
+            <label>마감 시각
+                <input id="chore-due-time" type="time" value="20:00" required>
+            </label>
+            <label id="weekly-day-field" hidden>마감 요일
+                <select id="chore-weekly-day">
+                    <option value="MONDAY">월요일</option>
+                    <option value="TUESDAY">화요일</option>
+                    <option value="WEDNESDAY">수요일</option>
+                    <option value="THURSDAY">목요일</option>
+                    <option value="FRIDAY">금요일</option>
+                    <option value="SATURDAY">토요일</option>
+                    <option value="SUNDAY" selected>일요일</option>
+                </select>
+            </label>
+            <label id="biweekly-anchor-field" hidden>격주 시작일
+                <input id="chore-biweekly-anchor" type="date">
+            </label>
+            <label>담당 가능 멤버
+                <select id="chore-eligibility-mode">
+                    <option value="ALL_ACTIVE_MEMBERS">모든 활성 멤버</option>
+                    <option value="SELECTED_MEMBERS">지정 멤버만</option>
+                </select>
+            </label>
+            <fieldset id="selected-members-field" hidden>
+                <legend>지정 멤버</legend>
+                <div id="eligible-member-list" class="member-check-list">멤버를 불러오는 중...</div>
+            </fieldset>
+            <button class="primary-button full-button" type="submit">생성하고 자동 배정</button>
+            <p id="create-chore-status" class="rotation-status" role="status"></p>
+        </form>
+    </dialog>
+
+    <dialog id="manage-rotation-dialog"
+            class="rotation-dialog rotation-dialog-wide"
+            aria-labelledby="manage-rotation-title">
+        <form id="manage-rotation-form">
+            <div class="dialog-heading">
+                <div>
+                    <p class="eyebrow">ROTATION SETTINGS</p>
+                    <h2 id="manage-rotation-title">로테이션 관리</h2>
+                </div>
+                <button id="close-manage-rotation" class="icon-button" type="button" aria-label="닫기">×</button>
+            </div>
+
+            <label for="manage-member-select">관리할 멤버
+                <select id="manage-member-select" required></select>
+            </label>
+            <p id="manage-member-summary" class="form-help"></p>
+
+            <fieldset>
+                <legend>참여 업무</legend>
+                <p class="form-help">체크한 업무의 다음 담당 후보에 이 멤버가 포함됩니다.</p>
+                <div id="manage-chore-options" class="member-check-list">
+                    멤버와 업무를 불러오는 중...
+                </div>
+            </fieldset>
+
+            <fieldset>
+                <legend>변경 적용 범위</legend>
+                <label class="choice-option">
+                    <input type="radio"
+                           name="application-scope"
+                           value="NEXT_OCCURRENCE"
+                           checked>
+                    <span class="choice-copy">
+                        <strong>다음 회차부터</strong>
+                        <small>현재 담당 업무는 유지하고 이후 회차부터 변경합니다.</small>
+                    </span>
+                </label>
+                <label class="choice-option">
+                    <input type="radio"
+                           name="application-scope"
+                           value="CURRENT_AND_FUTURE">
+                    <span class="choice-copy">
+                        <strong>현재 회차부터 즉시</strong>
+                        <small>현재 담당에서 제외되면 다른 멤버에게 자동 재배정될 수 있습니다.</small>
+                    </span>
+                </label>
+            </fieldset>
+
+            <div class="dialog-actions">
+                <button id="save-member-participations" class="primary-button" type="submit">
+                    참여 업무 저장
+                </button>
+                <button id="remove-group-member" class="danger-button" type="button">
+                    그룹에서 내보내기
+                </button>
+            </div>
+            <p id="manage-rotation-status"
+               class="rotation-status"
+               role="status"
+               aria-live="polite"></p>
+
+            <hr class="dialog-divider">
+            <section aria-labelledby="manage-invitation-title">
+                <h3 id="manage-invitation-title">멤버 초대</h3>
+                <p class="form-help">
+                    기존 하우스에 새 멤버를 초대할 코드를 발급합니다. 새 링크는 발급 후 24시간 동안 사용할 수 있습니다.
+                    기존에 발급한 링크는 원래 만료 시각까지 계속 사용할 수 있습니다.
+                </p>
+                <button id="reissue-invitation-button"
+                        class="secondary-button"
+                        type="button"
+                        disabled>
+                    초대 코드 새로 발급
+                </button>
+                <label for="reissued-invitation-url">새 초대 링크
+                    <input id="reissued-invitation-url" type="text" readonly>
+                </label>
+                <a id="reissued-invitation-link"
+                   class="secondary-link"
+                   href="#"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   hidden>초대 링크 열기</a>
+                <p id="reissue-invitation-status"
+                   class="rotation-status"
+                   role="status"
+                   aria-live="polite"></p>
+            </section>
+
+            <hr class="dialog-divider">
+            <section aria-labelledby="manage-chores-title">
+                <h3 id="manage-chores-title">업무 관리</h3>
+                <p class="form-help">업무를 비활성화해도 이미 생성된 회차와 과거 이력은 유지됩니다.</p>
+                <div id="manage-chore-list" class="chore-management-list">
+                    업무를 불러오는 중...
+                </div>
+            </section>
+        </form>
+    </dialog>
+
+    <dialog id="edit-chore-dialog"
+            class="rotation-dialog"
+            aria-labelledby="edit-chore-title">
+        <form id="edit-chore-form">
+            <div class="dialog-heading">
+                <div>
+                    <p class="eyebrow">EDIT CHORE</p>
+                    <h2 id="edit-chore-title">업무 수정</h2>
+                </div>
+                <button id="close-edit-chore" class="icon-button" type="button" aria-label="닫기">×</button>
+            </div>
+            <label>업무 이름
+                <input id="edit-chore-name" maxlength="100" required>
+            </label>
+            <label>반복
+                <select id="edit-chore-frequency">
+                    <option value="DAILY">매일</option>
+                    <option value="WEEKLY">매주</option>
+                    <option value="BIWEEKLY">격주</option>
+                </select>
+            </label>
+            <label>마감 시각
+                <input id="edit-chore-due-time" type="time" required>
+            </label>
+            <label id="edit-weekly-day-field" hidden>마감 요일
+                <select id="edit-chore-weekly-day">
+                    <option value="MONDAY">월요일</option>
+                    <option value="TUESDAY">화요일</option>
+                    <option value="WEDNESDAY">수요일</option>
+                    <option value="THURSDAY">목요일</option>
+                    <option value="FRIDAY">금요일</option>
+                    <option value="SATURDAY">토요일</option>
+                    <option value="SUNDAY">일요일</option>
+                </select>
+            </label>
+            <label id="edit-biweekly-anchor-field" hidden>격주 시작일
+                <input id="edit-chore-biweekly-anchor" type="date">
+            </label>
+            <button class="primary-button full-button" type="submit">변경 저장</button>
+            <p id="edit-chore-status" class="rotation-status" role="status"></p>
+        </form>
+    </dialog>
+
+    <dialog id="notifications-dialog"
+            class="rotation-dialog rotation-dialog-wide"
+            aria-labelledby="notifications-title">
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">NOTIFICATION API CHECK</p>
+                <h2 id="notifications-title">알림 API 확인</h2>
+            </div>
+            <button id="close-notifications" class="icon-button" type="button" aria-label="닫기">×</button>
+        </div>
+
+        <div class="notification-summary-grid" aria-label="알림 요약">
+            <article class="notification-stat">
+                <span>마감 임박</span>
+                <strong id="notification-due-soon-count">0</strong>
+            </article>
+            <article class="notification-stat">
+                <span>대타 요청</span>
+                <strong id="notification-substitute-count">0</strong>
+            </article>
+            <article class="notification-stat notification-stat-total">
+                <span>합계</span>
+                <strong id="notification-total-count">0</strong>
+            </article>
+        </div>
+
+        <div class="dialog-actions notification-actions">
+            <button id="refresh-notifications" class="secondary-button" type="button">새로고침</button>
+        </div>
+        <p id="notification-status"
+           class="rotation-status"
+           role="status"
+           aria-live="polite"></p>
+
+        <section class="notification-section" aria-labelledby="due-soon-title">
+            <div class="notification-section-heading">
+                <h3 id="due-soon-title">마감 임박 업무</h3>
+                <code>GET /occurrences/due-soon</code>
+            </div>
+            <div id="notification-due-soon-list" class="workflow-list"></div>
+        </section>
+
+        <section class="notification-section" aria-labelledby="pending-substitute-title">
+            <div class="notification-section-heading">
+                <h3 id="pending-substitute-title">받은 대타 요청</h3>
+                <code>GET /substitute-requests?box=INBOX&amp;status=PENDING</code>
+            </div>
+            <div id="notification-substitute-list" class="workflow-list"></div>
+        </section>
+
+        <p class="api-endpoint-note">
+            상단 합계는 <code>GET /notifications/summary</code> 응답과 비교할 수 있습니다.
+        </p>
+    </dialog>
+
+    <dialog id="substitute-requests-dialog"
+            class="rotation-dialog rotation-dialog-wide"
+            aria-labelledby="substitute-requests-title">
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">SUBSTITUTE REQUESTS</p>
+                <h2 id="substitute-requests-title">대타 요청함</h2>
+            </div>
+            <button id="close-substitute-requests" class="icon-button" type="button" aria-label="닫기">×</button>
+        </div>
+        <label>보기
+            <select id="substitute-request-box">
+                <option value="INBOX">받은 요청</option>
+                <option value="OUTBOX" selected>보낸 요청</option>
+                <option value="ALL">전체 요청</option>
+            </select>
+        </label>
+        <p id="substitute-request-status"
+           class="rotation-status"
+           role="status"
+           aria-live="polite"></p>
+        <section id="substitute-request-list" class="workflow-list"></section>
+    </dialog>
+
+    <dialog id="completed-history-dialog"
+            class="rotation-dialog rotation-dialog-wide"
+            aria-labelledby="completed-history-title">
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">COMPLETED HISTORY</p>
+                <h2 id="completed-history-title">전체 완료 업무 이력</h2>
+            </div>
+            <button id="close-completed-history" class="icon-button" type="button" aria-label="닫기">×</button>
+        </div>
+        <p id="completed-history-status"
+           class="rotation-status"
+           role="status"
+           aria-live="polite"></p>
+        <section id="completed-history-list" class="workflow-list"></section>
+    </dialog>
+</main>
+</body>
+</html>

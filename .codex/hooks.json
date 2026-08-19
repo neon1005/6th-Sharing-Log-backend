@@ -1,0 +1,33 @@
+{
+  "description": "Sharing Log repository hooks",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -File \"$(git rev-parse --show-toplevel)/.codex/hooks/session-start.ps1\"",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \".codex/hooks/session-start.ps1\"",
+            "statusMessage": "Loading Sharing Log repository context",
+            "additionalContextLimit": 1000,
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -File \"$(git rev-parse --show-toplevel)/.codex/hooks/stop-validation.ps1\"",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \".codex/hooks/stop-validation.ps1\"",
+            "statusMessage": "Validating changed Sharing Log files",
+            "timeout": 300
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,6 +1,7 @@
 package gdg.sharinglog.service.rotation.api.chore;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +22,8 @@ import gdg.sharinglog.service.rotation.access.RotationActor;
 import gdg.sharinglog.service.rotation.access.RotationActorAccessService;
 import gdg.sharinglog.service.rotation.access.RotationMemberNotFoundException;
 import gdg.sharinglog.web.rotation.error.RotationConflictException;
+import gdg.sharinglog.web.rotation.error.RotationBadRequestException;
+import gdg.sharinglog.web.rotation.error.RotationFieldError;
 import gdg.sharinglog.web.rotation.error.RotationNotFoundException;
 import gdg.sharinglog.web.rotation.error.RotationProblemCode;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +55,12 @@ public class ChoreApplicationService {
                 Objects.requireNonNull(createdAt, "업무 생성 시각은 필수입니다.");
         RotationActor actor =
                 accessService.requireOwnerForUpdate(groupPublicId, registrationId, principal);
+        validateInitialBiweeklyDueDate(
+                actor,
+                command.frequency(),
+                command.biweeklyDueDate(),
+                effectiveCreatedAt
+        );
         List<GroupMember> selectedMembers = resolveSelectedMembers(actor, command);
         Chore chore = choreRepository.saveAndFlush(createChore(actor, command, effectiveCreatedAt));
         enrollmentService.initializeChore(chore, selectedMembers, effectiveCreatedAt);
@@ -112,11 +121,12 @@ public class ChoreApplicationService {
         boolean scheduleChanged = false;
         if (command.schedule() != null) {
             UpdateChoreCommand.Schedule schedule = command.schedule();
+            validateChangedBiweeklyDueDate(chore, schedule, effectiveChangedAt);
             scheduleChanged = chore.reschedule(
                     schedule.frequency(),
                     schedule.dueTime(),
                     schedule.weeklyDueDay(),
-                    schedule.biweeklyAnchorDate()
+                    schedule.biweeklyDueDate()
             );
         }
         boolean eligibilityChanged = command.eligibility() != null
@@ -141,6 +151,71 @@ public class ChoreApplicationService {
             occurrencePlanService.regenerateFuture(updated, effectiveChangedAt);
         }
         return new ChoreView(updated, currentEligibleMembers(updated));
+    }
+
+    private void validateInitialBiweeklyDueDate(
+            RotationActor actor,
+            ChoreFrequency frequency,
+            LocalDate biweeklyDueDate,
+            Instant requestedAt
+    ) {
+        if (frequency != ChoreFrequency.BIWEEKLY) {
+            return;
+        }
+        requireFutureBiweeklyDueDate(
+                Objects.requireNonNull(biweeklyDueDate, "격주 마감일은 필수입니다."),
+                requestedAt,
+                actor.group().timeZone()
+        );
+    }
+
+    private void validateChangedBiweeklyDueDate(
+            Chore chore,
+            UpdateChoreCommand.Schedule schedule,
+            Instant requestedAt
+    ) {
+        if (schedule.frequency() != ChoreFrequency.BIWEEKLY) {
+            return;
+        }
+        LocalDate dueDate = Objects.requireNonNull(
+                schedule.biweeklyDueDate(),
+                "격주 마감일은 필수입니다."
+        );
+        boolean dueDateChanged = chore.getFrequency() != ChoreFrequency.BIWEEKLY
+                || !Objects.equals(chore.getBiweeklyDueDate(), dueDate);
+        if (dueDateChanged) {
+            requireFutureBiweeklyDueDate(
+                    dueDate,
+                    requestedAt,
+                    chore.getGroup().timeZone()
+            );
+        }
+    }
+
+    private void requireFutureBiweeklyDueDate(
+            LocalDate dueDate,
+            Instant requestedAt,
+            java.time.ZoneId groupZone
+    ) {
+        if (dueDate.isAfter(Chore.MAX_BIWEEKLY_DUE_DATE)) {
+            throwBiweeklyDueDateValidationError("격주 마감일이 지원 날짜 범위를 벗어났습니다.");
+        }
+        LocalDate requestedOn = requestedAt.atZone(groupZone).toLocalDate();
+        if (dueDate.isAfter(requestedOn)) {
+            return;
+        }
+        throwBiweeklyDueDateValidationError("격주 마감일은 요청일 다음 날 이후여야 합니다.");
+    }
+
+    private void throwBiweeklyDueDateValidationError(String reason) {
+        throw new RotationBadRequestException(
+                RotationProblemCode.VALIDATION_FAILED,
+                reason,
+                Map.of(
+                        "errors",
+                        List.of(new RotationFieldError("schedule.biweeklyDueDate", reason))
+                )
+        );
     }
 
     @Transactional
@@ -199,7 +274,7 @@ public class ChoreApplicationService {
                     actor.membership(),
                     command.name(),
                     command.eligibilityMode(),
-                    command.biweeklyAnchorDate(),
+                    command.biweeklyDueDate(),
                     command.dueTime(),
                     createdAt
             );

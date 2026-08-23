@@ -36,32 +36,31 @@ class ChoreScheduleValidationTest {
         );
         Chore biweekly = Chore.biweekly(
                 group, membership, "분리수거", ChoreEligibilityMode.ALL_ACTIVE_MEMBERS,
-                LocalDate.of(2026, 7, 20), LocalTime.of(20, 0), now
+                LocalDate.of(2026, 7, 21), LocalTime.of(20, 0), now
         );
 
         assertEquals(ChoreFrequency.DAILY, daily.getFrequency());
         assertEquals(DayOfWeek.SATURDAY, weekly.getWeeklyDueDay());
-        assertEquals(LocalDate.of(2026, 7, 20), biweekly.getBiweeklyAnchorDate());
+        assertEquals(LocalDate.of(2026, 7, 21), biweekly.getBiweeklyDueDate());
     }
 
     @Test
-    void rejectsBiweeklyAnchorThatDoesNotMatchGroupWeekStart() {
-        User owner = user("bad-anchor-owner");
+    void acceptsBiweeklyDueDateOnAnyWeekday() {
+        User owner = user("arbitrary-due-day-owner");
         SharingGroup group = new SharingGroup("우리 집", owner);
         GroupMember membership = GroupMember.owner(group, owner);
 
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> Chore.biweekly(
-                        group,
-                        membership,
-                        "분리수거",
-                        ChoreEligibilityMode.ALL_ACTIVE_MEMBERS,
-                        LocalDate.of(2026, 7, 21),
-                        LocalTime.of(20, 0),
-                        Instant.parse("2026-07-23T00:00:00Z")
-                )
+        Chore chore = Chore.biweekly(
+                group,
+                membership,
+                "분리수거",
+                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS,
+                LocalDate.of(2026, 7, 21),
+                LocalTime.of(20, 0),
+                Instant.parse("2026-07-20T00:00:00Z")
         );
+
+        assertEquals(LocalDate.of(2026, 7, 21), chore.getBiweeklyDueDate());
     }
 
     @Test
@@ -112,7 +111,7 @@ class ChoreScheduleValidationTest {
         assertEquals(ChoreFrequency.WEEKLY, chore.getFrequency());
         assertEquals(LocalTime.of(19, 30), chore.getDueTime());
         assertEquals(DayOfWeek.SATURDAY, chore.getWeeklyDueDay());
-        assertNull(chore.getBiweeklyAnchorDate());
+        assertNull(chore.getBiweeklyDueDate());
         assertTrue(changed);
         assertEquals(1L, chore.getScheduleRevision());
         assertFalse(chore.reschedule(

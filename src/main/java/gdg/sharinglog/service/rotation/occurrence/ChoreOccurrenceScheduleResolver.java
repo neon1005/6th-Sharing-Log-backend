@@ -2,6 +2,7 @@ package gdg.sharinglog.service.rotation.occurrence;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 
 import gdg.sharinglog.domain.rotation.Chore;
@@ -38,14 +39,26 @@ public class ChoreOccurrenceScheduleResolver {
         return switch (chore.getFrequency()) {
             case DAILY -> RecurrenceRule.daily();
             case WEEKLY -> RecurrenceRule.weekly(chore.getGroup().getWeekStartsOn());
-            case BIWEEKLY -> RecurrenceRule.biweekly(chore.getBiweeklyAnchorDate());
+            case BIWEEKLY -> RecurrenceRule.biweekly(
+                    chore.getBiweeklyDueDate(),
+                    chore.getGroup().getWeekStartsOn()
+            );
         };
     }
 
     private LocalDate dueDate(Chore chore, RecurrencePeriod period) {
         return switch (chore.getFrequency()) {
             case DAILY -> period.periodStart();
-            case BIWEEKLY -> period.periodEndExclusive().minusDays(1);
+            case BIWEEKLY -> {
+                long dueOffset = Math.floorMod(
+                        ChronoUnit.DAYS.between(
+                                period.periodStart(),
+                                chore.getBiweeklyDueDate()
+                        ),
+                        14L
+                );
+                yield period.periodStart().plusDays(dueOffset);
+            }
             case WEEKLY -> {
                 int dayOffset = Math.floorMod(
                         chore.getWeeklyDueDay().getValue()

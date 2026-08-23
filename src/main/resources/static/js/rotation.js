@@ -11,7 +11,7 @@
     const createForm = document.querySelector("#create-chore-form");
     const frequencyInput = document.querySelector("#chore-frequency");
     const weeklyField = document.querySelector("#weekly-day-field");
-    const biweeklyField = document.querySelector("#biweekly-anchor-field");
+    const biweeklyField = document.querySelector("#biweekly-due-field");
     const eligibilityMode = document.querySelector("#chore-eligibility-mode");
     const selectedMembersField = document.querySelector("#selected-members-field");
     const eligibleMemberList = document.querySelector("#eligible-member-list");
@@ -36,7 +36,7 @@
     const editChoreForm = document.querySelector("#edit-chore-form");
     const editChoreFrequency = document.querySelector("#edit-chore-frequency");
     const editWeeklyField = document.querySelector("#edit-weekly-day-field");
-    const editBiweeklyField = document.querySelector("#edit-biweekly-anchor-field");
+    const editBiweeklyField = document.querySelector("#edit-biweekly-due-field");
     const editChoreStatus = document.querySelector("#edit-chore-status");
     const syncScheduleFields = syncSchedule.bind(null, frequencyInput, weeklyField, biweeklyField);
     const syncEditScheduleFields =
@@ -67,6 +67,7 @@
     let managementMembers = [];
     let managementChores = [];
     let editingChore = null;
+    let groupActiveOn = null;
 
     if (!groupId) {
         status.textContent = "주소에 groupId가 필요합니다. 그룹 생성 화면에서 로테이션을 열어 주세요.";
@@ -75,6 +76,7 @@
 
     document.querySelector("#open-create-chore").addEventListener("click", () => {
         createStatus.textContent = "";
+        prepareCreateBiweeklyDueDate();
         createDialog.showModal();
         void loadEligibleMembers();
     });
@@ -105,7 +107,7 @@
     manageForm.addEventListener("submit", saveMemberParticipations);
     editChoreForm.addEventListener("submit", updateChore);
 
-    document.querySelector("#chore-biweekly-anchor").value = mondayOfCurrentWeek();
+    prepareCreateBiweeklyDueDate();
     syncScheduleFields();
     syncEditScheduleFields();
     syncEligibilityField();
@@ -120,6 +122,8 @@
             const response = await requestJson(
                 `${groupPath}/occurrences?frequency=${encodeURIComponent(frequency)}`
             );
+            groupActiveOn = response.query?.activeOn || groupActiveOn;
+            prepareCreateBiweeklyDueDate();
             const items = Array.isArray(response.items) ? response.items : [];
             renderOccurrences(items);
             status.textContent = items.length
@@ -272,8 +276,8 @@
                 weeklyDueDay: selectedFrequency === "WEEKLY"
                     ? document.querySelector("#chore-weekly-day").value
                     : null,
-                biweeklyAnchorDate: selectedFrequency === "BIWEEKLY"
-                    ? document.querySelector("#chore-biweekly-anchor").value
+                biweeklyDueDate: selectedFrequency === "BIWEEKLY"
+                    ? document.querySelector("#chore-biweekly-due-date").value
                     : null
             },
             eligibility: {mode: "ALL_ACTIVE_MEMBERS", membershipIds: []}
@@ -292,7 +296,7 @@
             ));
             createForm.reset();
             document.querySelector("#chore-due-time").value = "20:00";
-            document.querySelector("#chore-biweekly-anchor").value = mondayOfCurrentWeek();
+            prepareCreateBiweeklyDueDate();
             syncScheduleFields();
             syncEligibilityField();
             createDialog.close();
@@ -700,8 +704,8 @@
             (chore.schedule.dueTime || "20:00").slice(0, 5);
         document.querySelector("#edit-chore-weekly-day").value =
             chore.schedule.weeklyDueDay || "SUNDAY";
-        document.querySelector("#edit-chore-biweekly-anchor").value =
-            chore.schedule.biweeklyAnchorDate || mondayOfCurrentWeek();
+        document.querySelector("#edit-chore-biweekly-due-date").value =
+            chore.schedule.biweeklyDueDate || tomorrowGroupDate();
         syncEditScheduleFields();
         editChoreDialog.showModal();
     }
@@ -722,8 +726,8 @@
                 weeklyDueDay: selectedFrequency === "WEEKLY"
                     ? document.querySelector("#edit-chore-weekly-day").value
                     : null,
-                biweeklyAnchorDate: selectedFrequency === "BIWEEKLY"
-                    ? document.querySelector("#edit-chore-biweekly-anchor").value
+                biweeklyDueDate: selectedFrequency === "BIWEEKLY"
+                    ? document.querySelector("#edit-chore-biweekly-due-date").value
                     : null
             }
         };
@@ -1203,11 +1207,32 @@
         }
     }
 
-    function mondayOfCurrentWeek() {
+    function tomorrowGroupDate() {
+        if (groupActiveOn) {
+            return addIsoDays(groupActiveOn, 1);
+        }
         const date = new Date();
-        const day = date.getDay() || 7;
-        date.setDate(date.getDate() - day + 1);
+        date.setDate(date.getDate() + 1);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+    }
+
+    function addIsoDays(isoDate, days) {
+        const [year, month, day] = isoDate.split("-").map(Number);
+        const date = new Date(Date.UTC(year, month - 1, day));
+        date.setUTCDate(date.getUTCDate() + days);
         return date.toISOString().slice(0, 10);
+    }
+
+    function prepareCreateBiweeklyDueDate() {
+        const input = document.querySelector("#chore-biweekly-due-date");
+        const minimum = tomorrowGroupDate();
+        input.min = minimum;
+        if (!input.value || input.value < minimum) {
+            input.value = minimum;
+        }
     }
 
     function activateFrequencyTab(nextFrequency) {
@@ -1296,7 +1321,7 @@
         }
         if (frequencyValue === "BIWEEKLY") {
             return `${frequencyLabel(frequencyValue)} · `
-                + `${schedule.biweeklyAnchorDate || "시작일 미정"} 시작 · `
+                + `${schedule.biweeklyDueDate || "마감일 미정"}부터 2주마다 `
                 + `${dueTime} 마감`;
         }
         return `${frequencyLabel(frequencyValue)} · ${dueTime} 마감`;

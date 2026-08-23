@@ -39,6 +39,8 @@ import lombok.NoArgsConstructor;
 @Entity
 public class Chore {
 
+    public static final LocalDate MAX_BIWEEKLY_DUE_DATE = LocalDate.of(9999, 12, 24);
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", updatable = false)
@@ -81,8 +83,8 @@ public class Chore {
     @Column(name = "weekly_due_day", length = 10)
     private DayOfWeek weeklyDueDay;
 
-    @Column(name = "biweekly_anchor_date")
-    private LocalDate biweeklyAnchorDate;
+    @Column(name = "biweekly_due_date")
+    private LocalDate biweeklyDueDate;
 
     @Column(name = "active", nullable = false)
     private boolean active;
@@ -108,7 +110,7 @@ public class Chore {
             ChoreEligibilityMode eligibilityMode,
             LocalTime dueTime,
             DayOfWeek weeklyDueDay,
-            LocalDate biweeklyAnchorDate,
+            LocalDate biweeklyDueDate,
             Instant createdAt
     ) {
         this.group = Objects.requireNonNull(group, "그룹은 필수입니다.");
@@ -118,7 +120,7 @@ public class Chore {
         this.eligibilityMode = Objects.requireNonNull(eligibilityMode, "가능 멤버 방식은 필수입니다.");
         this.dueTime = Objects.requireNonNull(dueTime, "마감 시각은 필수입니다.");
         this.weeklyDueDay = weeklyDueDay;
-        this.biweeklyAnchorDate = biweeklyAnchorDate;
+        this.biweeklyDueDate = biweeklyDueDate;
         this.createdAt = Objects.requireNonNull(createdAt, "생성 시각은 필수입니다.");
         this.publicId = UUID.randomUUID().toString();
         this.active = true;
@@ -161,13 +163,13 @@ public class Chore {
             GroupMember createdBy,
             String name,
             ChoreEligibilityMode eligibilityMode,
-            LocalDate anchorDate,
+            LocalDate dueDate,
             LocalTime dueTime,
             Instant createdAt
     ) {
         return new Chore(
                 group, createdBy, name, ChoreFrequency.BIWEEKLY, eligibilityMode,
-                dueTime, null, Objects.requireNonNull(anchorDate, "격주 기준일은 필수입니다."), createdAt
+                dueTime, null, Objects.requireNonNull(dueDate, "격주 마감일은 필수입니다."), createdAt
         );
     }
 
@@ -200,28 +202,27 @@ public class Chore {
             ChoreFrequency frequency,
             LocalTime dueTime,
             DayOfWeek weeklyDueDay,
-            LocalDate biweeklyAnchorDate
+            LocalDate biweeklyDueDate
     ) {
         ChoreFrequency requiredFrequency =
                 Objects.requireNonNull(frequency, "반복 주기는 필수입니다.");
         LocalTime requiredDueTime =
                 Objects.requireNonNull(dueTime, "마감 시각은 필수입니다.");
         validateSchedule(
-                group,
                 requiredFrequency,
                 weeklyDueDay,
-                biweeklyAnchorDate
+                biweeklyDueDate
         );
         if (this.frequency == requiredFrequency
                 && this.dueTime.equals(requiredDueTime)
                 && Objects.equals(this.weeklyDueDay, weeklyDueDay)
-                && Objects.equals(this.biweeklyAnchorDate, biweeklyAnchorDate)) {
+                && Objects.equals(this.biweeklyDueDate, biweeklyDueDate)) {
             return false;
         }
         this.frequency = requiredFrequency;
         this.dueTime = requiredDueTime;
         this.weeklyDueDay = weeklyDueDay;
-        this.biweeklyAnchorDate = biweeklyAnchorDate;
+        this.biweeklyDueDate = biweeklyDueDate;
         this.scheduleRevision = Math.incrementExact(this.scheduleRevision);
         return true;
     }
@@ -235,30 +236,31 @@ public class Chore {
     }
 
     private void validateSchedule() {
-        validateSchedule(group, frequency, weeklyDueDay, biweeklyAnchorDate);
+        validateSchedule(frequency, weeklyDueDay, biweeklyDueDate);
     }
 
     private static void validateSchedule(
-            SharingGroup group,
             ChoreFrequency frequency,
             DayOfWeek weeklyDueDay,
-            LocalDate biweeklyAnchorDate
+            LocalDate biweeklyDueDate
     ) {
-        SharingGroup requiredGroup = Objects.requireNonNull(group, "그룹은 필수입니다.");
         switch (Objects.requireNonNull(frequency, "반복 주기는 필수입니다.")) {
             case DAILY -> {
                 requireNull(weeklyDueDay, "일간 업무에는 주간 마감 요일을 설정할 수 없습니다.");
-                requireNull(biweeklyAnchorDate, "일간 업무에는 격주 기준일을 설정할 수 없습니다.");
+                requireNull(biweeklyDueDate, "일간 업무에는 격주 마감일을 설정할 수 없습니다.");
             }
             case WEEKLY -> {
                 Objects.requireNonNull(weeklyDueDay, "주간 마감 요일은 필수입니다.");
-                requireNull(biweeklyAnchorDate, "주간 업무에는 격주 기준일을 설정할 수 없습니다.");
+                requireNull(biweeklyDueDate, "주간 업무에는 격주 마감일을 설정할 수 없습니다.");
             }
             case BIWEEKLY -> {
                 requireNull(weeklyDueDay, "격주 업무에는 주간 마감 요일을 설정할 수 없습니다.");
-                Objects.requireNonNull(biweeklyAnchorDate, "격주 기준일은 필수입니다.");
-                if (biweeklyAnchorDate.getDayOfWeek() != requiredGroup.getWeekStartsOn()) {
-                    throw new IllegalArgumentException("격주 기준일은 그룹의 주 시작 요일과 같아야 합니다.");
+                LocalDate requiredDueDate = Objects.requireNonNull(
+                        biweeklyDueDate,
+                        "격주 마감일은 필수입니다."
+                );
+                if (requiredDueDate.isAfter(MAX_BIWEEKLY_DUE_DATE)) {
+                    throw new IllegalArgumentException("격주 마감일이 지원 날짜 범위를 벗어났습니다.");
                 }
             }
         }

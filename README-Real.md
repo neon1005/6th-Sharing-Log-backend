@@ -1,5 +1,5 @@
 #### 컨벤션
-git switch -c feature/#50-group-api-check-ui      # 타입/이슈번호-작업명
+git switch -c feature/#85-skip-backdated-occurrences      # 타입/이슈번호-작업명
 
 #### 배포 흐름
 

@@ -232,6 +232,30 @@ class ChoreOccurrenceStateMachineTest {
         );
     }
 
+    @Test
+    void rejectsBiweeklyOccurrenceBeforeTheConfiguredFirstDueDate() {
+        Chore biweekly = Chore.biweekly(
+                group,
+                firstMember,
+                "격주 청소",
+                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS,
+                LocalDate.of(2026, 8, 24),
+                LocalTime.of(20, 0),
+                instant("2026-08-23T06:00:00Z")
+        );
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> ChoreOccurrence.create(
+                        biweekly,
+                        LocalDate.of(2026, 8, 3),
+                        LocalDate.of(2026, 8, 17),
+                        instant("2026-08-10T11:00:00Z"),
+                        instant("2026-08-03T00:00:00Z")
+                )
+        );
+    }
+
     private ChoreAssignmentAttempt assignment(
             GroupMember member,
             int sequence,

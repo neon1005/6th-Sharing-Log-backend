@@ -32,7 +32,11 @@ public final class RecurrencePeriodCalculator {
             case RecurrenceRule.Daily ignored -> daily(referenceDate);
             case RecurrenceRule.Weekly weekly -> weekly(referenceDate, weekly.weekStartsOn());
             case RecurrenceRule.Biweekly biweekly ->
-                    biweekly(referenceDate, biweekly.anchor());
+                    biweekly(
+                            referenceDate,
+                            biweekly.firstDueDate(),
+                            biweekly.weekStartsOn()
+                    );
         };
     }
 
@@ -49,10 +53,24 @@ public final class RecurrencePeriodCalculator {
         return new RecurrencePeriod(periodStart, periodStart.plusWeeks(1));
     }
 
-    private RecurrencePeriod biweekly(LocalDate referenceDate, LocalDate anchor) {
-        long daysFromAnchor = ChronoUnit.DAYS.between(anchor, referenceDate);
+    private RecurrencePeriod biweekly(
+            LocalDate referenceDate,
+            LocalDate firstDueDate,
+            DayOfWeek weekStartsOn
+    ) {
+        LocalDate firstDueWeekStart = startOfWeek(firstDueDate, weekStartsOn);
+        LocalDate firstPeriodStart = firstDueWeekStart.minusWeeks(1);
+        long daysFromAnchor = ChronoUnit.DAYS.between(firstPeriodStart, referenceDate);
         long blockIndex = Math.floorDiv(daysFromAnchor, DAYS_PER_BIWEEK);
-        LocalDate periodStart = anchor.plusDays(blockIndex * DAYS_PER_BIWEEK);
+        LocalDate periodStart = firstPeriodStart.plusDays(blockIndex * DAYS_PER_BIWEEK);
         return new RecurrencePeriod(periodStart, periodStart.plusDays(DAYS_PER_BIWEEK));
+    }
+
+    private LocalDate startOfWeek(LocalDate date, DayOfWeek weekStartsOn) {
+        int daysSinceWeekStart = Math.floorMod(
+                date.getDayOfWeek().getValue() - weekStartsOn.getValue(),
+                DAYS_PER_WEEK
+        );
+        return date.minusDays(daysSinceWeekStart);
     }
 }

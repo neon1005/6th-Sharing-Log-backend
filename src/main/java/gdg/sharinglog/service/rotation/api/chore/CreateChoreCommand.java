@@ -13,7 +13,7 @@ public record CreateChoreCommand(
         ChoreFrequency frequency,
         LocalTime dueTime,
         DayOfWeek weeklyDueDay,
-        LocalDate biweeklyAnchorDate,
+        LocalDate biweeklyDueDate,
         ChoreEligibilityMode eligibilityMode,
         List<String> eligibleMembershipPublicIds
 ) {

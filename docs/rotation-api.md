@@ -73,7 +73,7 @@
 - 요일은 `MONDAY`부터 `SUNDAY`까지의 영문 enum을 사용한다.
 - 회차 기간은 `[periodStart, periodEndExclusive)` 반개구간이다.
 - 기간 계산에는 회차의 `timeZoneIdSnapshot`을 사용한다.
-- 일간 마감일은 `periodStart`, 주간 마감일은 `weeklyDueDay`, 격주 마감일은 `periodEndExclusive` 직전 현지 날짜다. 각각의 날짜에 `dueTime`을 적용해 `dueAt`을 만든다.
+- 일간 마감일은 `periodStart`, 주간 마감일은 `weeklyDueDay`, 격주 마감일은 최초 `biweeklyDueDate`와 그로부터 14일 간격인 현지 날짜다. 각각의 날짜에 `dueTime`을 적용해 `dueAt`을 만든다.
 
 ### 2.4 리소스 버전과 동시성
 
@@ -143,11 +143,11 @@ Idempotency-Key: aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa
   "title": "요청 값이 올바르지 않습니다.",
   "status": 400,
   "code": "VALIDATION_FAILED",
-  "detail": "요청 필드를 확인해 주세요.",
+  "detail": "격주 마감일은 요청일 다음 날 이후여야 합니다.",
   "errors": [
     {
-      "field": "schedule.biweeklyAnchorDate",
-      "reason": "격주 기준일은 그룹의 주 시작 요일과 같아야 합니다."
+      "field": "schedule.biweeklyDueDate",
+      "reason": "격주 마감일은 요청일 다음 날 이후여야 합니다."
     }
   ],
   "traceId": "01K12ABCDEF89XYZ"
@@ -182,7 +182,7 @@ API는 사용자 계정 ID나 이메일 대신 그룹 멤버십의 공개 UUID�
     "frequency": "WEEKLY",
     "dueTime": "20:00:00",
     "weeklyDueDay": "SUNDAY",
-    "biweeklyAnchorDate": null
+    "biweeklyDueDate": null
   },
   "eligibility": {
     "mode": "SELECTED_MEMBERS",
@@ -212,16 +212,16 @@ API는 사용자 계정 ID나 이메일 대신 그룹 멤버십의 공개 UUID�
 
 | `frequency` | 필수 필드 | 반드시 `null`인 필드 |
 |---|---|---|
-| `DAILY` | `dueTime` | `weeklyDueDay`, `biweeklyAnchorDate` |
-| `WEEKLY` | `dueTime`, `weeklyDueDay` | `biweeklyAnchorDate` |
-| `BIWEEKLY` | `dueTime`, `biweeklyAnchorDate` | `weeklyDueDay` |
+| `DAILY` | `dueTime` | `weeklyDueDay`, `biweeklyDueDate` |
+| `WEEKLY` | `dueTime`, `weeklyDueDay` | `biweeklyDueDate` |
+| `BIWEEKLY` | `dueTime`, `biweeklyDueDate` | `weeklyDueDay` |
 
 `eligibility.mode` 값은 다음과 같다.
 
 - `ALL_ACTIVE_MEMBERS`: 회차 생성 시점의 모든 활성 멤버가 가능 멤버다. `members`는 빈 배열이다.
 - `SELECTED_MEMBERS`: `members`에 등록된 멤버 중 활성 멤버만 후보가 된다.
 
-업무 일정 변경은 업무의 일정 개정 번호를 증가시킨다. 변경 시점의 현지 날짜에 활성인 미종료 회차가 있으면 그 회차의 ID, 담당자, 상태는 유지하고 주기·기간·마감 시각 스냅샷만 새 개정으로 즉시 변경한다. 완료된 회차의 스냅샷은 바뀌지 않는다.
+업무 일정 변경은 업무의 일정 개정 번호를 증가시킨다. 변경 시점의 현지 날짜를 새 일정의 첫 생성 대상 기간이 포함하고 활성인 미종료 회차가 있으면 그 회차의 ID, 담당자, 상태는 유지하고 주기·기간·마감 시각 스냅샷만 새 개정으로 즉시 변경한다. 새 격주 첫 마감일의 기간이 변경일보다 뒤에서 시작하면 기존 활성 회차는 계획 재생성으로 취소하고 선택한 첫 마감일 회차부터 다시 만든다. 완료된 회차의 스냅샷은 바뀌지 않는다.
 
 ### 3.3 회차 요약
 
@@ -436,7 +436,7 @@ API는 사용자 계정 ID나 이메일 대신 그룹 멤버십의 공개 UUID�
 
 | 메서드 | URI | 용도 | 성공 |
 |---|---|---|---|
-| `POST` | `/api/groups/{groupId}/chores` | 업무 생성 및 현재 회차 최초 배정 | `201` |
+| `POST` | `/api/groups/{groupId}/chores` | 업무 생성 및 최초 생성 대상 회차 배정 | `201` |
 | `GET` | `/api/groups/{groupId}/chores` | 업무 목록 | `200` |
 | `PATCH` | `/api/groups/{groupId}/chores/{choreId}` | 업무명·주기·마감일·가능 멤버 수정 | `200` |
 | `DELETE` | `/api/groups/{groupId}/chores/{choreId}` | 업무 비활성화 | `204` |
@@ -475,7 +475,7 @@ Idempotency-Key: aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa
     "frequency": "WEEKLY",
     "dueTime": "20:00:00",
     "weeklyDueDay": "SUNDAY",
-    "biweeklyAnchorDate": null
+    "biweeklyDueDate": null
   },
   "eligibility": {
     "mode": "SELECTED_MEMBERS",
@@ -505,7 +505,7 @@ ETag: "1"
       "frequency": "WEEKLY",
       "dueTime": "20:00:00",
       "weeklyDueDay": "SUNDAY",
-      "biweeklyAnchorDate": null
+      "biweeklyDueDate": null
     },
     "eligibility": {
       "mode": "SELECTED_MEMBERS",
@@ -544,7 +544,7 @@ ETag: "1"
 }
 ```
 
-업무 생성은 현재 현지 날짜가 속한 회차 생성까지 한 트랜잭션에서 수행한다. 후보가 있으면 `ASSIGNED`, 없으면 생성 자체를 실패시키지 않고 `NEEDS_ATTENTION`으로 응답한다. `(choreId, periodStart)` 유일 제약으로 중복 회차를 막는다.
+업무 생성은 현재 주를 포함한 5개 주간 창의 롤링 범위에 속하는 회차 생성·배정을 한 트랜잭션에서 수행한다. 주간 업무에서 현재 기간의 `dueAt`이 업무의 `createdAt`보다 이르면 그 회차를 건너뛴다. 격주 업무는 사용자가 고른 `biweeklyDueDate`를 첫 마감일로 삼으며, 그보다 앞선 동일 주기 회차를 역산해 만들지 않는다. 첫 마감일이 기본 롤링 범위 밖이면 그 첫 회차까지 생성 범위를 확장한다. 응답의 `currentOccurrence`에는 생성된 회차 중 첫 회차를 담고, 일간 업무는 생성한 현지 날짜 회차부터 시작한다. 각 회차는 후보가 있으면 `ASSIGNED`, 없으면 생성 자체를 실패시키지 않고 `NEEDS_ATTENTION`으로 저장한다. `(choreId, periodStart)` 유일 제약으로 중복 회차를 막는다.
 
 검증 규칙:
 
@@ -552,7 +552,7 @@ ETag: "1"
 - `SELECTED_MEMBERS`: 같은 그룹의 활성 멤버를 1명 이상 지정
 - 중복 `membershipId`: `400 VALIDATION_FAILED`
 - 알 수 없거나 다른 그룹의 멤버: `404 RESOURCE_NOT_FOUND`
-- 격주 `biweeklyAnchorDate`: 그룹의 `weekStartsOn`과 같은 요일
+- 격주 `biweeklyDueDate`: 업무 생성일의 다음 날부터 `9999-12-24`까지 선택할 수 있는 첫 마감일. 이후 마감일은 14일 간격
 
 ### 5.2 업무 목록
 
@@ -578,7 +578,7 @@ GET /api/groups/{groupId}/chores?frequency=WEEKLY&active=true
         "frequency": "WEEKLY",
         "dueTime": "20:00:00",
         "weeklyDueDay": "SUNDAY",
-        "biweeklyAnchorDate": null
+        "biweeklyDueDate": null
       },
       "eligibility": {
         "mode": "SELECTED_MEMBERS",
@@ -613,7 +613,7 @@ If-Match: "3"
     "frequency": "WEEKLY",
     "dueTime": "19:00:00",
     "weeklyDueDay": "SATURDAY",
-    "biweeklyAnchorDate": null
+    "biweeklyDueDate": null
   },
   "eligibility": {
     "mode": "SELECTED_MEMBERS",
@@ -630,8 +630,8 @@ If-Match: "3"
 - `eligibility`를 보내면 모드와 멤버십 ID 목록 전체를 보낸다. `ALL_ACTIVE_MEMBERS`는 빈 목록, `SELECTED_MEMBERS`는 중복 없는 활성 그룹 멤버 한 명 이상이어야 한다.
 - 가능 멤버 변경은 업무 설정과 미리 생성된 미래 회차에 적용한다. 현재 활성 회차의 담당자와 가능 멤버 스냅샷까지 즉시 바꾸려면 멤버별 참여 업무 일괄 변경 API의 `CURRENT_AND_FUTURE` 범위를 사용한다.
 - 일정이 실제로 달라지면 업무의 일정 개정 번호를 증가시킨다. 같은 일정을 다시 보내거나 업무명만 변경하면 개정 번호는 증가하지 않는다.
-- 변경 시점의 그룹 현지 날짜에 활성인 `ASSIGNED` 또는 `NEEDS_ATTENTION` 회차가 있으면 회차 ID, 담당자, 상태, 가능 멤버 스냅샷은 유지하고 주기·기간·마감 시각 스냅샷을 새 일정 개정으로 즉시 변경한다.
-- 활성 미종료 회차가 없으면 완료 이력을 변경하거나 PATCH 처리 중 새 회차를 만들지 않는다. 이후 스케줄러가 회차를 생성할 때 새 일정 개정을 사용한다.
+- 변경 시점의 그룹 현지 날짜를 새 일정의 첫 생성 대상 기간이 포함하고 활성인 `ASSIGNED` 또는 `NEEDS_ATTENTION` 회차가 있으면 회차 ID, 담당자, 상태, 가능 멤버 스냅샷은 유지하고 주기·기간·마감 시각 스냅샷을 새 일정 개정으로 즉시 변경한다.
+- 새 격주 첫 마감일의 기간이 변경일보다 뒤에서 시작하면 기존 활성 회차를 `PLAN_REGENERATED`로 종료하고 선택한 첫 마감일 회차부터 다시 만든다. 그 밖에 활성 미종료 회차가 없으면 완료 이력은 유지하고 새 일정으로 미래 계획을 다시 만든다.
 - 회차 중복 기준은 `(choreId, scheduleRevision, periodStart)`다. 따라서 완료 이력과 새 개정의 기간 시작일이 같아도 별도 회차로 보존할 수 있다.
 
 성공 시 `200`, 갱신된 전체 업무와 새 `ETag`를 반환한다.
@@ -662,7 +662,7 @@ GET /api/groups/{groupId}/occurrences?frequency=WEEKLY&activeOn=2026-07-23
 GET /api/groups/{groupId}/occurrences?frequency=BIWEEKLY&activeOn=2026-07-23
 ```
 
-격주 업무마다 `anchorDate`가 다를 수 있으므로 `activeOn`은 단순히 하나의 공통 시작일로 변환하지 않는다. 각 업무 회차에 대해 `periodStart <= activeOn < periodEndExclusive`를 검사한다.
+격주 업무마다 첫 `biweeklyDueDate`와 2주 주기의 위상이 다를 수 있으므로 `activeOn`은 단순히 하나의 공통 시작일로 변환하지 않는다. 각 업무 회차에 대해 `periodStart <= activeOn < periodEndExclusive`를 검사한다.
 
 응답:
 
@@ -1094,7 +1094,7 @@ ETag: "3"
 | HTTP | 대표 코드 | 의미 |
 |---|---|---|
 | `200` | - | 조회, 수정, 상태 전이 성공. 후보 없음도 유효한 `200` 결과 |
-| `201` | - | 업무와 현재 회차 생성 성공 |
+| `201` | - | 업무와 최초 생성 대상 회차 생성 성공 |
 | `204` | - | 업무 비활성화 성공 |
 | `400` | `VALIDATION_FAILED`, `INVALID_QUERY` | 본문, enum, 날짜 범위, UUID 형식 오류 |
 | `401` | `UNAUTHENTICATED` | 로그인 필요 |
@@ -1132,3 +1132,4 @@ API 구현은 어느 진입점에서도 다음 조건을 깨뜨리면 안 된다
 13. `COMPLETED`는 마지막 유효 완료자만 재개할 수 있고, 취소된 완료는 완료·기간 업무량 집계에서 제외한다.
 14. 회차당 진행 중 대타 요청은 최대 하나이고, 요청당 수락자는 최대 한 명이다.
 15. 모든 응답과 오류는 공개 UUID만 사용한다.
+16. 주간 신규 업무에서 최초로 생성하는 회차는 `dueAt >= chore.createdAt`이고, 격주 신규 업무의 첫 마감일은 요청일 다음 날 이후이며 `biweeklyDueDate`보다 이른 회차를 만들지 않는다. 일간 업무는 생성한 현지 날짜부터 시작한다.

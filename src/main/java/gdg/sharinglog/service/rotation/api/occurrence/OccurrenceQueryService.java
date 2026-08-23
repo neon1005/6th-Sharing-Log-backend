@@ -3,9 +3,11 @@ package gdg.sharinglog.service.rotation.api.occurrence;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import gdg.sharinglog.domain.GroupMember;
 import gdg.sharinglog.domain.rotation.ChoreFrequency;
@@ -193,7 +195,8 @@ public class OccurrenceQueryService {
             String registrationId,
             OAuth2User principal,
             boolean mineOnly,
-            String chorePublicId
+            String chorePublicId,
+            boolean includeOverdue
     ) {
         RotationActor actor =
                 accessService.requireActiveMember(groupPublicId, registrationId, principal);
@@ -201,13 +204,18 @@ public class OccurrenceQueryService {
                 .findAllByChore_Group_IdAndStatusOrderByClosedAtDescIdDesc(
                         actor.group().getId(),
                         OccurrenceStatus.COMPLETED
+                );
+        List<ChoreOccurrence> overdue = includeOverdue
+                ? occurrenceRepository.findAllOverdueAssignedByGroupId(
+                        actor.group().getId(),
+                        Instant.now()
                 )
-                .stream()
+                : List.of();
+        var items = Stream.concat(completed.stream(), overdue.stream())
                 .filter(item -> chorePublicId == null
                         || item.getChore().getPublicId().equals(chorePublicId))
-                .filter(item -> !mineOnly || completedBy(item, actor.membership()))
-                .toList();
-        var items = completed.stream()
+                .filter(item -> !mineOnly || matchesMineOnly(item, actor.membership()))
+                .sorted(Comparator.comparing(this::effectiveTimestamp).reversed())
                 .map(item -> viewMapper.completedOccurrence(item, actor))
                 .toList();
         return new CompletedOccurrenceHistoryResponse(
@@ -216,6 +224,17 @@ public class OccurrenceQueryService {
                 items,
                 items.size()
         );
+    }
+
+    private Instant effectiveTimestamp(ChoreOccurrence occurrence) {
+        return occurrence.getClosedAt() != null ? occurrence.getClosedAt() : occurrence.getDueAt();
+    }
+
+    private boolean matchesMineOnly(ChoreOccurrence occurrence, GroupMember actor) {
+        if (occurrence.getStatus() == OccurrenceStatus.COMPLETED) {
+            return completedBy(occurrence, actor);
+        }
+        return isCurrentAssignee(occurrence, actor);
     }
 
     private boolean isCurrentAssignee(ChoreOccurrence occurrence, GroupMember actor) {

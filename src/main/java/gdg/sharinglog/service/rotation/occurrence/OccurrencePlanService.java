@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Objects;
 
 import gdg.sharinglog.domain.rotation.Chore;
+import gdg.sharinglog.domain.rotation.ChoreFrequency;
 import gdg.sharinglog.domain.rotation.ChoreOccurrence;
 import gdg.sharinglog.repository.SharingGroupRepository;
 import gdg.sharinglog.repository.rotation.ChoreOccurrenceRepository;
@@ -42,6 +43,12 @@ public class OccurrencePlanService {
                 requiredChore.getGroup(),
                 activeOn
         );
+        if (requiredChore.getFrequency() == ChoreFrequency.BIWEEKLY) {
+            LocalDate firstDueEndExclusive = requiredChore.getBiweeklyDueDate().plusDays(1);
+            if (firstDueEndExclusive.isAfter(horizonEnd)) {
+                horizonEnd = firstDueEndExclusive;
+            }
+        }
         return generationService.ensureOccurrencesUntil(
                 requiredChore.getId(),
                 effectiveGeneratedAt,
@@ -56,7 +63,26 @@ public class OccurrencePlanService {
 
     @Transactional
     public void regenerateFutureAfterScheduleChange(Chore chore, Instant changedAt) {
-        rebuildFuture(List.of(requirePersistedChore(chore)), changedAt, false, true);
+        Chore requiredChore = requirePersistedChore(chore);
+        Instant effectiveChangedAt = Objects.requireNonNull(
+                changedAt,
+                "Plan change time is required."
+        );
+        LocalDate activeOn = effectiveChangedAt
+                .atZone(requiredChore.getGroup().timeZone())
+                .toLocalDate();
+        List<ChoreOccurrence> outdatedOpenOccurrences = occurrenceRepository
+                .findAllOpenByChoreIdForUpdate(requiredChore.getId())
+                .stream()
+                .filter(occurrence -> occurrence.getScheduleRevisionSnapshot()
+                        != requiredChore.getScheduleRevision())
+                .filter(occurrence -> occurrence.getPeriodEndExclusive().isAfter(activeOn))
+                .toList();
+        cancelOccurrences(outdatedOpenOccurrences, effectiveChangedAt);
+        occurrenceRepository.flush();
+        if (requiredChore.isActive()) {
+            ensureRollingHorizon(requiredChore, effectiveChangedAt);
+        }
     }
 
     @Transactional

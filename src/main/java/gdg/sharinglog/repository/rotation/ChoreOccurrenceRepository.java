@@ -248,6 +248,25 @@ public interface ChoreOccurrenceRepository extends JpaRepository<ChoreOccurrence
             select occurrence
             from ChoreOccurrence occurrence
             where occurrence.chore.group.id = :groupId
+              and occurrence.status = gdg.sharinglog.domain.rotation.OccurrenceStatus.ASSIGNED
+              and occurrence.dueAt < :now
+            order by occurrence.dueAt desc, occurrence.id desc
+            """)
+    List<ChoreOccurrence> findAllOverdueAssignedByGroupId(
+            @Param("groupId") Long groupId,
+            @Param("now") Instant now
+    );
+
+    @EntityGraph(attributePaths = {
+            "chore",
+            "currentAssignment",
+            "currentAssignment.assignee",
+            "currentAssignment.assignee.user"
+    })
+    @Query("""
+            select occurrence
+            from ChoreOccurrence occurrence
+            where occurrence.chore.group.id = :groupId
               and occurrence.chore.active = true
               and occurrence.status = gdg.sharinglog.domain.rotation.OccurrenceStatus.ASSIGNED
               and occurrence.currentAssignment.assignee.id = :membershipId

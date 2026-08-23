@@ -10,6 +10,7 @@ import java.util.Optional;
 import gdg.sharinglog.domain.GroupMember;
 import gdg.sharinglog.domain.rotation.AssignmentTrigger;
 import gdg.sharinglog.domain.rotation.Chore;
+import gdg.sharinglog.domain.rotation.ChoreFrequency;
 import gdg.sharinglog.domain.rotation.ChoreOccurrence;
 import gdg.sharinglog.domain.rotation.OccurrenceEligibleMember;
 import gdg.sharinglog.repository.SharingGroupRepository;
@@ -43,7 +44,7 @@ public class OccurrenceGenerationService {
                 "기준 시각은 필수입니다."
         );
         Chore chore = lockedActiveChore(choreId);
-        OccurrenceSchedule schedule = scheduleResolver.resolve(chore, effectiveReference);
+        OccurrenceSchedule schedule = firstGeneratableSchedule(chore, effectiveReference);
         return ensureOccurrence(chore, schedule, effectiveReference);
     }
 
@@ -70,7 +71,7 @@ public class OccurrenceGenerationService {
         }
 
         List<ChoreOccurrence> ensured = new ArrayList<>();
-        OccurrenceSchedule schedule = scheduleResolver.resolve(chore, effectiveGeneratedAt);
+        OccurrenceSchedule schedule = firstGeneratableSchedule(chore, effectiveGeneratedAt);
         while (schedule.periodStart().isBefore(effectiveHorizonEnd)) {
             ensured.add(ensureOccurrence(
                     chore,
@@ -83,6 +84,48 @@ public class OccurrenceGenerationService {
             schedule = scheduleResolver.resolve(chore, nextPeriodReference);
         }
         return List.copyOf(ensured);
+    }
+
+    private OccurrenceSchedule firstGeneratableSchedule(
+            Chore chore,
+            Instant referenceInstant
+    ) {
+        Instant effectiveReference = referenceInstant.isBefore(chore.getCreatedAt())
+                ? chore.getCreatedAt()
+                : referenceInstant;
+        OccurrenceSchedule schedule = scheduleResolver.resolve(chore, effectiveReference);
+        if (chore.getFrequency() == ChoreFrequency.BIWEEKLY
+                && localDueDate(chore, schedule).isBefore(chore.getBiweeklyDueDate())) {
+            Instant firstDueReference = chore.getBiweeklyDueDate()
+                    .atStartOfDay(chore.getGroup().timeZone())
+                    .toInstant();
+            schedule = scheduleResolver.resolve(chore, firstDueReference);
+        }
+        while (shouldSkipInitialSchedule(chore, schedule)) {
+            Instant nextPeriodReference = schedule.periodEndExclusive()
+                    .atStartOfDay(chore.getGroup().timeZone())
+                    .toInstant();
+            schedule = scheduleResolver.resolve(chore, nextPeriodReference);
+        }
+        return schedule;
+    }
+
+    private boolean shouldSkipInitialSchedule(
+            Chore chore,
+            OccurrenceSchedule schedule
+    ) {
+        if (chore.getFrequency() == ChoreFrequency.DAILY) {
+            return false;
+        }
+        if (schedule.dueAt().isBefore(chore.getCreatedAt())) {
+            return true;
+        }
+        return chore.getFrequency() == ChoreFrequency.BIWEEKLY
+                && localDueDate(chore, schedule).isBefore(chore.getBiweeklyDueDate());
+    }
+
+    private LocalDate localDueDate(Chore chore, OccurrenceSchedule schedule) {
+        return LocalDate.ofInstant(schedule.dueAt(), chore.getGroup().timeZone());
     }
 
     private Chore lockedActiveChore(Long choreId) {
@@ -148,7 +191,14 @@ public class OccurrenceGenerationService {
             throw new IllegalStateException("같은 업무에 활성 미종료 회차가 둘 이상 존재합니다.");
         }
 
-        OccurrenceSchedule schedule = scheduleResolver.resolve(requiredChore, effectiveReference);
+        OccurrenceSchedule schedule = firstGeneratableSchedule(
+                requiredChore,
+                effectiveReference
+        );
+        if (activeOn.isBefore(schedule.periodStart())
+                || !activeOn.isBefore(schedule.periodEndExclusive())) {
+            return Optional.empty();
+        }
         ChoreOccurrence occurrence = activeOccurrences.getFirst();
         occurrence.rescheduleToCurrentRevision(
                 schedule.periodStart(),

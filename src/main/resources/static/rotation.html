@@ -175,8 +175,8 @@
                     <option value="SUNDAY" selected>일요일</option>
                 </select>
             </label>
-            <label id="biweekly-anchor-field" hidden>격주 시작일
-                <input id="chore-biweekly-anchor" type="date">
+            <label id="biweekly-due-field" hidden>첫 마감일
+                <input id="chore-biweekly-due-date" type="date" max="9999-12-24">
             </label>
             <label>담당 가능 멤버
                 <select id="chore-eligibility-mode">
@@ -328,8 +328,8 @@
                     <option value="SUNDAY">일요일</option>
                 </select>
             </label>
-            <label id="edit-biweekly-anchor-field" hidden>격주 시작일
-                <input id="edit-chore-biweekly-anchor" type="date">
+            <label id="edit-biweekly-due-field" hidden>격주 마감일 기준
+                <input id="edit-chore-biweekly-due-date" type="date" max="9999-12-24">
             </label>
             <button class="primary-button full-button" type="submit">변경 저장</button>
             <p id="edit-chore-status" class="rotation-status" role="status"></p>

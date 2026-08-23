@@ -1,6 +1,8 @@
 package gdg.sharinglog.service.rotation.api.occurrence;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -218,5 +220,124 @@ class OccurrenceQueryServiceTest {
         assertEquals(fromInclusive, response.fromInclusive());
         assertEquals(toExclusive, response.toExclusive());
         assertEquals(List.of(mapped), response.items());
+    }
+
+    @Test
+    void completedHistoryDoesNotQueryOverdueOccurrencesByDefault() {
+        String groupPublicId = "group-public-id";
+        OAuth2User principal = mock(OAuth2User.class);
+        SharingGroup group = mock(SharingGroup.class);
+        GroupMember membership = mock(GroupMember.class);
+        User user = mock(User.class);
+        RotationActor actor = new RotationActor(group, membership, user);
+
+        when(accessService.requireActiveMember(groupPublicId, "google", principal))
+                .thenReturn(actor);
+        when(group.getId()).thenReturn(1L);
+        when(group.getPublicId()).thenReturn(groupPublicId);
+        when(occurrenceRepository.findAllByChore_Group_IdAndStatusOrderByClosedAtDescIdDesc(
+                1L,
+                OccurrenceStatus.COMPLETED
+        )).thenReturn(List.of());
+
+        service.findCompletedHistory(
+                groupPublicId,
+                "google",
+                principal,
+                false,
+                null,
+                false
+        );
+
+        verify(occurrenceRepository, never())
+                .findAllOverdueAssignedByGroupId(eq(1L), any());
+    }
+
+    @Test
+    void completedHistoryIncludesOverdueAssignedOccurrencesWhenRequested() {
+        String groupPublicId = "group-public-id";
+        OAuth2User principal = mock(OAuth2User.class);
+        SharingGroup group = mock(SharingGroup.class);
+        GroupMember membership = mock(GroupMember.class);
+        User user = mock(User.class);
+        RotationActor actor = new RotationActor(group, membership, user);
+        ChoreOccurrence completedOccurrence = mock(ChoreOccurrence.class);
+        ChoreOccurrence overdueOccurrence = mock(ChoreOccurrence.class);
+        OccurrenceSummaryResponse completedResponse = mock(OccurrenceSummaryResponse.class);
+        OccurrenceSummaryResponse overdueResponse = mock(OccurrenceSummaryResponse.class);
+
+        when(accessService.requireActiveMember(groupPublicId, "google", principal))
+                .thenReturn(actor);
+        when(group.getId()).thenReturn(1L);
+        when(group.getPublicId()).thenReturn(groupPublicId);
+        when(completedOccurrence.getClosedAt()).thenReturn(Instant.parse("2026-08-19T00:00:00Z"));
+        when(overdueOccurrence.getClosedAt()).thenReturn(null);
+        when(overdueOccurrence.getDueAt()).thenReturn(Instant.parse("2026-08-20T00:00:00Z"));
+        when(occurrenceRepository.findAllByChore_Group_IdAndStatusOrderByClosedAtDescIdDesc(
+                1L,
+                OccurrenceStatus.COMPLETED
+        )).thenReturn(List.of(completedOccurrence));
+        when(occurrenceRepository.findAllOverdueAssignedByGroupId(eq(1L), any()))
+                .thenReturn(List.of(overdueOccurrence));
+        when(viewMapper.completedOccurrence(completedOccurrence, actor))
+                .thenReturn(completedResponse);
+        when(viewMapper.completedOccurrence(overdueOccurrence, actor))
+                .thenReturn(overdueResponse);
+
+        var response = service.findCompletedHistory(
+                groupPublicId,
+                "google",
+                principal,
+                false,
+                null,
+                true
+        );
+
+        assertEquals(2, response.totalCount());
+        assertEquals(List.of(overdueResponse, completedResponse), response.items());
+    }
+
+    @Test
+    void completedHistoryMineOnlyFiltersOverdueOccurrencesByCurrentAssignee() {
+        String groupPublicId = "group-public-id";
+        OAuth2User principal = mock(OAuth2User.class);
+        SharingGroup group = mock(SharingGroup.class);
+        GroupMember membership = mock(GroupMember.class);
+        GroupMember otherMembership = mock(GroupMember.class);
+        User user = mock(User.class);
+        RotationActor actor = new RotationActor(group, membership, user);
+        ChoreOccurrence mine = mock(ChoreOccurrence.class);
+        ChoreOccurrence someoneElses = mock(ChoreOccurrence.class);
+        OccurrenceSummaryResponse mineResponse = mock(OccurrenceSummaryResponse.class);
+
+        when(accessService.requireActiveMember(groupPublicId, "google", principal))
+                .thenReturn(actor);
+        when(group.getId()).thenReturn(1L);
+        when(group.getPublicId()).thenReturn(groupPublicId);
+        when(membership.getId()).thenReturn(10L);
+        when(otherMembership.getId()).thenReturn(11L);
+        when(mine.getStatus()).thenReturn(OccurrenceStatus.ASSIGNED);
+        when(mine.currentAssignee()).thenReturn(java.util.Optional.of(membership));
+        when(someoneElses.getStatus()).thenReturn(OccurrenceStatus.ASSIGNED);
+        when(someoneElses.currentAssignee()).thenReturn(java.util.Optional.of(otherMembership));
+        when(occurrenceRepository.findAllByChore_Group_IdAndStatusOrderByClosedAtDescIdDesc(
+                1L,
+                OccurrenceStatus.COMPLETED
+        )).thenReturn(List.of());
+        when(occurrenceRepository.findAllOverdueAssignedByGroupId(eq(1L), any()))
+                .thenReturn(List.of(mine, someoneElses));
+        when(viewMapper.completedOccurrence(mine, actor)).thenReturn(mineResponse);
+
+        var response = service.findCompletedHistory(
+                groupPublicId,
+                "google",
+                principal,
+                true,
+                null,
+                true
+        );
+
+        assertEquals(List.of(mineResponse), response.items());
+        verify(viewMapper, never()).completedOccurrence(someoneElses, actor);
     }
 }

@@ -19,7 +19,7 @@ public record UpdateChoreCommand(
             ChoreFrequency frequency,
             LocalTime dueTime,
             DayOfWeek weeklyDueDay,
-            LocalDate biweeklyAnchorDate
+            LocalDate biweeklyDueDate
     ) {
     }
 

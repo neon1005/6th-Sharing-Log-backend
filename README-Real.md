@@ -35,11 +35,18 @@ APP_OAUTH2_SUCCESS_URL = http://localhost:5173/
 APP_PUBLIC_BASE_URL = http://localhost:5173
 
 
-BS 환경변수 (배포)
+BS 환경변수 (이전 배포)
 APP_FRONTEND_ORIGIN = https://6th-sharing-log-frontend-teal.vercel.app
 APP_OAUTH2_FAILURE_URL = https://6th-sharing-log-frontend-teal.vercel.app/?error=true
 APP_OAUTH2_SUCCESS_URL = https://6th-sharing-log-frontend-teal.vercel.app/
 APP_PUBLIC_BASE_URL = https://sharinglog-43-200-12-73.sslip.io
+
+BS 환경변수 (new 배포) # 버셀 URL 바뀜
+APP_FRONTEND_ORIGIN = https://gachi-sharing-log.vercel.app
+APP_OAUTH2_FAILURE_URL = https://gachi-sharing-log.vercel.app/?error=true
+APP_OAUTH2_SUCCESS_URL = https://gachi-sharing-log.vercel.app/
+APP_PUBLIC_BASE_URL = https://sharinglog-43-200-12-73.sslip.io
+
 
 BS 환경변수 공통
 SERVER_PORT = 5000

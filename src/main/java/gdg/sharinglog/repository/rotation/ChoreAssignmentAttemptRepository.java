@@ -25,6 +25,10 @@ public interface ChoreAssignmentAttemptRepository
     Optional<ChoreAssignmentAttempt>
     findFirstByOccurrence_IdOrderBySequenceNumberDesc(Long occurrenceId);
 
+    @EntityGraph(attributePaths = {"assignee", "assignee.user"})
+    Optional<ChoreAssignmentAttempt>
+    findFirstByOccurrence_IdOrderBySequenceNumberAsc(Long occurrenceId);
+
     long countByOccurrence_Id(Long occurrenceId);
 
     boolean existsByOccurrence_IdAndAssignee_IdAndEndReason(

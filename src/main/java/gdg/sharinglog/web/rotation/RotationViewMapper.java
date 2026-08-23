@@ -6,6 +6,7 @@ import java.util.Optional;
 
 import gdg.sharinglog.domain.GroupMember;
 import gdg.sharinglog.domain.User;
+import gdg.sharinglog.domain.rotation.ChoreAssignmentAttempt;
 import gdg.sharinglog.domain.rotation.ChoreOccurrence;
 import gdg.sharinglog.domain.rotation.OccurrenceStatus;
 import gdg.sharinglog.domain.rotation.SubstituteRequest;
@@ -89,6 +90,8 @@ public class RotationViewMapper {
                 occurrence.getStatus(),
                 occurrence.currentAssignee().map(this::member).orElse(null),
                 lastAssignee(occurrence),
+                originalAssignee(occurrence),
+                completedBy(occurrence),
                 attention(occurrence),
                 substituteRequestNotice(activeSubstituteRequest, actor),
                 availableActions(occurrence, actor, activeSubstituteRequest),
@@ -125,6 +128,21 @@ public class RotationViewMapper {
         }
         return assignmentRepository
                 .findFirstByOccurrence_IdOrderBySequenceNumberDesc(occurrence.getId())
+                .map(attempt -> member(attempt.getAssignee()))
+                .orElse(null);
+    }
+
+    private MemberRefResponse originalAssignee(ChoreOccurrence occurrence) {
+        return assignmentRepository
+                .findFirstByOccurrence_IdOrderBySequenceNumberAsc(occurrence.getId())
+                .map(attempt -> member(attempt.getAssignee()))
+                .orElse(null);
+    }
+
+    private MemberRefResponse completedBy(ChoreOccurrence occurrence) {
+        return assignmentRepository
+                .findFirstByOccurrence_IdOrderBySequenceNumberDesc(occurrence.getId())
+                .filter(ChoreAssignmentAttempt::isEffectiveCompletion)
                 .map(attempt -> member(attempt.getAssignee()))
                 .orElse(null);
     }

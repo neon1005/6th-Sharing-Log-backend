@@ -10,6 +10,7 @@ import java.util.Optional;
 import gdg.sharinglog.domain.GroupMember;
 import gdg.sharinglog.domain.rotation.AssignmentTrigger;
 import gdg.sharinglog.domain.rotation.Chore;
+import gdg.sharinglog.domain.rotation.ChoreFrequency;
 import gdg.sharinglog.domain.rotation.ChoreOccurrence;
 import gdg.sharinglog.domain.rotation.OccurrenceEligibleMember;
 import gdg.sharinglog.repository.SharingGroupRepository;
@@ -43,7 +44,7 @@ public class OccurrenceGenerationService {
                 "기준 시각은 필수입니다."
         );
         Chore chore = lockedActiveChore(choreId);
-        OccurrenceSchedule schedule = scheduleResolver.resolve(chore, effectiveReference);
+        OccurrenceSchedule schedule = firstNonBackdatedSchedule(chore, effectiveReference);
         return ensureOccurrence(chore, schedule, effectiveReference);
     }
 
@@ -70,7 +71,7 @@ public class OccurrenceGenerationService {
         }
 
         List<ChoreOccurrence> ensured = new ArrayList<>();
-        OccurrenceSchedule schedule = scheduleResolver.resolve(chore, effectiveGeneratedAt);
+        OccurrenceSchedule schedule = firstNonBackdatedSchedule(chore, effectiveGeneratedAt);
         while (schedule.periodStart().isBefore(effectiveHorizonEnd)) {
             ensured.add(ensureOccurrence(
                     chore,
@@ -83,6 +84,28 @@ public class OccurrenceGenerationService {
             schedule = scheduleResolver.resolve(chore, nextPeriodReference);
         }
         return List.copyOf(ensured);
+    }
+
+    private OccurrenceSchedule firstNonBackdatedSchedule(
+            Chore chore,
+            Instant referenceInstant
+    ) {
+        OccurrenceSchedule schedule = scheduleResolver.resolve(chore, referenceInstant);
+        while (isBackdatedInitialSchedule(chore, schedule)) {
+            Instant nextPeriodReference = schedule.periodEndExclusive()
+                    .atStartOfDay(chore.getGroup().timeZone())
+                    .toInstant();
+            schedule = scheduleResolver.resolve(chore, nextPeriodReference);
+        }
+        return schedule;
+    }
+
+    private boolean isBackdatedInitialSchedule(
+            Chore chore,
+            OccurrenceSchedule schedule
+    ) {
+        return chore.getFrequency() != ChoreFrequency.DAILY
+                && schedule.dueAt().isBefore(chore.getCreatedAt());
     }
 
     private Chore lockedActiveChore(Long choreId) {

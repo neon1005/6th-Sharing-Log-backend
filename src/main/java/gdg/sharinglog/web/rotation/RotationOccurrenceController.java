@@ -130,6 +130,7 @@ public class RotationOccurrenceController {
             @PathVariable String groupId,
             @RequestParam(defaultValue = "false") boolean mineOnly,
             @RequestParam(required = false) String choreId,
+            @RequestParam(defaultValue = "false") boolean includeOverdue,
             OAuth2AuthenticationToken authentication
     ) {
         return queryService.findCompletedHistory(
@@ -137,7 +138,8 @@ public class RotationOccurrenceController {
                 authentication.getAuthorizedClientRegistrationId(),
                 authentication.getPrincipal(),
                 mineOnly,
-                choreId
+                choreId,
+                includeOverdue
         );
     }
 

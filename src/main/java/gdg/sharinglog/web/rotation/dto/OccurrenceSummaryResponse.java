@@ -19,6 +19,8 @@ public record OccurrenceSummaryResponse(
         OccurrenceStatus status,
         MemberRefResponse currentAssignee,
         MemberRefResponse lastAssignee,
+        MemberRefResponse originalAssignee,
+        MemberRefResponse completedBy,
         AttentionResponse attention,
         String substituteRequestNotice,
         List<AvailableAction> availableActions,

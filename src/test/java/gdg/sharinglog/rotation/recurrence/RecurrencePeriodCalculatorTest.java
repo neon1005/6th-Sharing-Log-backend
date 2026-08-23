@@ -61,33 +61,40 @@ class RecurrencePeriodCalculatorTest {
     }
 
     @Test
-    void biweeklyStartsANewBlockAtTheAnchorAndEveryFourteenDays() {
-        RecurrenceRule rule = RecurrenceRule.biweekly(LocalDate.of(2026, 1, 15));
+    void biweeklyAlignsFourteenDayBlocksAroundTheFirstDueDate() {
+        RecurrenceRule rule = RecurrenceRule.biweekly(
+                LocalDate.of(2026, 8, 24),
+                DayOfWeek.MONDAY
+        );
 
-        assertThat(calculator.calculate(LocalDate.of(2026, 1, 15), rule))
-                .isEqualTo(period("2026-01-15", "2026-01-29"));
-        assertThat(calculator.calculate(LocalDate.of(2026, 1, 28), rule))
-                .isEqualTo(period("2026-01-15", "2026-01-29"));
-        assertThat(calculator.calculate(LocalDate.of(2026, 1, 29), rule))
-                .isEqualTo(period("2026-01-29", "2026-02-12"));
+        assertThat(calculator.calculate(LocalDate.of(2026, 8, 23), rule))
+                .isEqualTo(period("2026-08-17", "2026-08-31"));
+        assertThat(calculator.calculate(LocalDate.of(2026, 8, 30), rule))
+                .isEqualTo(period("2026-08-17", "2026-08-31"));
+        assertThat(calculator.calculate(LocalDate.of(2026, 8, 31), rule))
+                .isEqualTo(period("2026-08-31", "2026-09-14"));
     }
 
     @Test
-    void biweeklyUsesFloorDivisionBeforeTheAnchor() {
-        RecurrenceRule rule = RecurrenceRule.biweekly(LocalDate.of(2026, 1, 15));
-
-        RecurrencePeriod oneDayBeforeAnchor = calculator.calculate(
-                LocalDate.of(2026, 1, 14),
-                rule
-        );
-        RecurrencePeriod fifteenDaysBeforeAnchor = calculator.calculate(
-                LocalDate.of(2025, 12, 31),
-                rule
+    void biweeklyUsesFloorDivisionBeforeTheFirstPeriod() {
+        RecurrenceRule rule = RecurrenceRule.biweekly(
+                LocalDate.of(2026, 8, 24),
+                DayOfWeek.MONDAY
         );
 
-        assertThat(oneDayBeforeAnchor).isEqualTo(period("2026-01-01", "2026-01-15"));
-        assertThat(fifteenDaysBeforeAnchor)
-                .isEqualTo(period("2025-12-18", "2026-01-01"));
+        RecurrencePeriod oneDayBeforeFirstPeriod = calculator.calculate(
+                LocalDate.of(2026, 8, 16),
+                rule
+        );
+        RecurrencePeriod fifteenDaysBeforeFirstPeriod = calculator.calculate(
+                LocalDate.of(2026, 8, 2),
+                rule
+        );
+
+        assertThat(oneDayBeforeFirstPeriod)
+                .isEqualTo(period("2026-08-03", "2026-08-17"));
+        assertThat(fifteenDaysBeforeFirstPeriod)
+                .isEqualTo(period("2026-07-20", "2026-08-03"));
     }
 
     @Test
@@ -95,7 +102,10 @@ class RecurrencePeriodCalculatorTest {
         LocalDate referenceDate = LocalDate.of(2026, 12, 31);
         RecurrencePeriod result = calculator.calculate(
                 referenceDate,
-                RecurrenceRule.biweekly(LocalDate.of(2026, 1, 1))
+                RecurrenceRule.biweekly(
+                        LocalDate.of(2026, 1, 1),
+                        DayOfWeek.MONDAY
+                )
         );
 
         assertThat(result.contains(referenceDate)).isTrue();

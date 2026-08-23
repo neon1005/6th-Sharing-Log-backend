@@ -17,8 +17,8 @@ public sealed interface RecurrenceRule
         return new Weekly(weekStartsOn);
     }
 
-    static Biweekly biweekly(LocalDate anchor) {
-        return new Biweekly(anchor);
+    static Biweekly biweekly(LocalDate firstDueDate, DayOfWeek weekStartsOn) {
+        return new Biweekly(firstDueDate, weekStartsOn);
     }
 
     record Daily() implements RecurrenceRule {
@@ -41,10 +41,11 @@ public sealed interface RecurrenceRule
         }
     }
 
-    record Biweekly(LocalDate anchor) implements RecurrenceRule {
+    record Biweekly(LocalDate firstDueDate, DayOfWeek weekStartsOn) implements RecurrenceRule {
 
         public Biweekly {
-            Objects.requireNonNull(anchor, "anchor must not be null");
+            Objects.requireNonNull(firstDueDate, "firstDueDate must not be null");
+            Objects.requireNonNull(weekStartsOn, "weekStartsOn must not be null");
         }
 
         @Override

@@ -192,7 +192,7 @@ public class RotationChoreController {
                 request.schedule().frequency(),
                 request.schedule().dueTime(),
                 request.schedule().weeklyDueDay(),
-                request.schedule().biweeklyAnchorDate(),
+                request.schedule().biweeklyDueDate(),
                 request.eligibility().mode(),
                 request.eligibility().membershipIds()
         );
@@ -205,7 +205,7 @@ public class RotationChoreController {
                         request.schedule().frequency(),
                         request.schedule().dueTime(),
                         request.schedule().weeklyDueDay(),
-                        request.schedule().biweeklyAnchorDate()
+                        request.schedule().biweeklyDueDate()
                 );
         UpdateChoreCommand.Eligibility eligibility = request.eligibility() == null
                 ? null

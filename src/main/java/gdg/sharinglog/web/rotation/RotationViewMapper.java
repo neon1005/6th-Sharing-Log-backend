@@ -39,7 +39,7 @@ public class RotationViewMapper {
                         chore.getFrequency(),
                         chore.getDueTime(),
                         chore.getWeeklyDueDay(),
-                        chore.getBiweeklyAnchorDate()
+                        chore.getBiweeklyDueDate()
                 ),
                 new ChoreResponse.EligibilityResponse(
                         chore.getEligibilityMode(),

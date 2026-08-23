@@ -434,19 +434,44 @@ class OccurrenceGenerationServiceTest {
     }
 
     @Test
-    void biweeklyPlanKeepsCurrentPeriodWhenDeadlineFollowsCreation() {
+    void biweeklyPlanUsesSelectedDateAsFirstDeadline() {
         Context context = context("biweekly-future-deadline");
         Instant createdAt = Instant.parse("2026-08-23T06:00:00Z");
         Chore biweekly = choreRepository.save(Chore.biweekly(
                 context.group(), context.ownerMembership(), "격주 업무",
-                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS, LocalDate.of(2026, 8, 17),
+                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS, LocalDate.of(2026, 8, 24),
                 LocalTime.of(20, 0), createdAt
         ));
 
-        ChoreOccurrence first = planService.ensureRollingHorizon(biweekly, createdAt).getFirst();
+        List<ChoreOccurrence> planned = planService.ensureRollingHorizon(biweekly, createdAt);
+        ChoreOccurrence first = planned.getFirst();
 
         assertEquals(LocalDate.of(2026, 8, 17), first.getPeriodStart());
-        assertEquals(Instant.parse("2026-08-30T11:00:00Z"), first.getDueAt());
+        assertEquals(Instant.parse("2026-08-24T11:00:00Z"), first.getDueAt());
+        assertTrue(planned.stream().anyMatch(occurrence ->
+                occurrence.getDueAt().equals(Instant.parse("2026-09-07T11:00:00Z"))));
+        assertTrue(planned.stream().noneMatch(occurrence ->
+                occurrence.getDueAt().equals(Instant.parse("2026-08-23T11:00:00Z"))));
+    }
+
+    @Test
+    void biweeklyPlanDoesNotBackGenerateBeforeFarFutureFirstDeadline() {
+        Context context = context("biweekly-far-future-deadline");
+        Instant createdAt = Instant.parse("2026-08-23T06:00:00Z");
+        LocalDate firstDueDate = Chore.MAX_BIWEEKLY_DUE_DATE;
+        Chore biweekly = choreRepository.save(Chore.biweekly(
+                context.group(), context.ownerMembership(), "먼 미래 격주 업무",
+                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS, firstDueDate,
+                LocalTime.of(20, 0), createdAt
+        ));
+
+        List<ChoreOccurrence> planned = planService.ensureRollingHorizon(biweekly, createdAt);
+
+        assertEquals(1, planned.size());
+        assertEquals(Instant.parse("9999-12-24T11:00:00Z"), planned.getFirst().getDueAt());
+        assertTrue(planned.stream().allMatch(occurrence ->
+                !LocalDate.ofInstant(occurrence.getDueAt(), context.group().timeZone())
+                        .isBefore(firstDueDate)));
     }
 
     @Test
@@ -455,7 +480,7 @@ class OccurrenceGenerationServiceTest {
         Instant createdAt = Instant.parse("2026-08-23T12:00:00Z");
         Chore biweekly = choreRepository.save(Chore.biweekly(
                 context.group(), context.ownerMembership(), "격주 마감 후 생성",
-                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS, LocalDate.of(2026, 8, 10),
+                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS, LocalDate.of(2026, 8, 23),
                 LocalTime.of(20, 0), createdAt
         ));
 
@@ -527,7 +552,7 @@ class OccurrenceGenerationServiceTest {
         ));
         Chore biweekly = choreRepository.save(Chore.biweekly(
                 context.group(), context.ownerMembership(), "격주 청소",
-                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS, currentWeekStart,
+                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS, currentWeekStart.plusDays(6),
                 LocalTime.of(20, 0), generatedAt
         ));
 
@@ -633,7 +658,7 @@ class OccurrenceGenerationServiceTest {
                     context.ownerMembership(),
                     "격주 업무",
                     ChoreEligibilityMode.ALL_ACTIVE_MEMBERS,
-                    LocalDate.of(2026, 7, 20),
+                    LocalDate.of(2026, 7, 26),
                     LocalTime.of(20, 0),
                     reference
             );
@@ -757,6 +782,83 @@ class OccurrenceGenerationServiceTest {
         assertEquals(Instant.parse("2026-07-26T10:00:00Z"), daily.getDueAt());
         assertEquals(OccurrenceStatus.ASSIGNED, daily.getStatus());
         assertEquals(assigneeId, daily.currentAssignee().orElseThrow().getId());
+    }
+
+    @Test
+    void scheduleChangeToFarFutureBiweeklyReplacesCurrentOccurrenceWithoutKeyCollision() {
+        Context context = context("far-future-biweekly-schedule-change");
+        Instant changedAt = Instant.parse("2026-08-23T06:00:00Z");
+        Chore chore = choreRepository.save(Chore.daily(
+                context.group(),
+                context.ownerMembership(),
+                "공용 청소",
+                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS,
+                LocalTime.of(20, 0),
+                Instant.parse("2026-08-01T00:00:00Z")
+        ));
+        ChoreOccurrence original = generationService.ensureCurrentOccurrence(
+                chore.getId(),
+                changedAt
+        );
+        LocalDate selectedDueDate = LocalDate.of(2026, 10, 20);
+        chore.reschedule(
+                ChoreFrequency.BIWEEKLY,
+                LocalTime.of(20, 0),
+                null,
+                selectedDueDate
+        );
+        choreRepository.saveAndFlush(chore);
+
+        assertTrue(generationService.rescheduleActiveOccurrence(chore, changedAt).isEmpty());
+        planService.regenerateFutureAfterScheduleChange(chore, changedAt);
+
+        assertEquals(OccurrenceStatus.CANCELLED, original.getStatus());
+        ChoreOccurrence replacement = occurrenceRepository.findAll().stream()
+                .filter(occurrence -> occurrence.getStatus() != OccurrenceStatus.CANCELLED)
+                .findFirst()
+                .orElseThrow();
+        assertEquals(selectedDueDate, LocalDate.ofInstant(
+                replacement.getDueAt(),
+                context.group().timeZone()
+        ));
+    }
+
+    @Test
+    void scheduleChangeKeepsAnOverdueOpenOccurrenceCompletable() {
+        Context context = context("overdue-before-schedule-change");
+        Instant generatedAt = Instant.parse("2026-08-23T06:00:00Z");
+        Chore chore = choreRepository.save(Chore.weekly(
+                context.group(),
+                context.ownerMembership(),
+                "주간 청소",
+                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS,
+                DayOfWeek.SUNDAY,
+                LocalTime.of(20, 0),
+                Instant.parse("2026-08-01T00:00:00Z")
+        ));
+        ChoreOccurrence overdue = generationService.ensureCurrentOccurrence(
+                chore.getId(),
+                generatedAt
+        );
+        Instant changedAt = Instant.parse("2026-09-01T03:00:00Z");
+        chore.reschedule(
+                ChoreFrequency.BIWEEKLY,
+                LocalTime.of(20, 0),
+                null,
+                LocalDate.of(2026, 10, 20)
+        );
+        choreRepository.saveAndFlush(chore);
+
+        assertTrue(generationService.rescheduleActiveOccurrence(chore, changedAt).isEmpty());
+        planService.regenerateFutureAfterScheduleChange(chore, changedAt);
+
+        assertEquals(OccurrenceStatus.ASSIGNED, overdue.getStatus());
+        commandService.complete(
+                overdue.getPublicId(),
+                overdue.currentAssignee().orElseThrow().getPublicId(),
+                changedAt.plusSeconds(60)
+        );
+        assertEquals(OccurrenceStatus.COMPLETED, overdue.getStatus());
     }
 
     @Test

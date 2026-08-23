@@ -66,26 +66,32 @@ class ChoreOccurrenceScheduleResolverTest {
     }
 
     @Test
-    void resolvesBiweeklyDueAtLastLocalDateOfCurrentBlock() {
+    void resolvesSelectedBiweeklyDateAsTheDeadlineAndRepeatsEveryFourteenDays() {
         Context context = context("Asia/Seoul", DayOfWeek.MONDAY);
         Chore chore = Chore.biweekly(
                 context.group(),
                 context.owner(),
                 "분리수거",
                 ChoreEligibilityMode.ALL_ACTIVE_MEMBERS,
-                LocalDate.of(2026, 7, 13),
+                LocalDate.of(2026, 8, 24),
                 LocalTime.of(20, 0),
                 Instant.EPOCH
         );
 
-        OccurrenceSchedule schedule = resolver.resolve(
+        OccurrenceSchedule first = resolver.resolve(
                 chore,
-                Instant.parse("2026-07-23T00:00:00Z")
+                Instant.parse("2026-08-23T00:00:00Z")
+        );
+        OccurrenceSchedule next = resolver.resolve(
+                chore,
+                Instant.parse("2026-08-31T00:00:00Z")
         );
 
-        assertEquals(LocalDate.of(2026, 7, 13), schedule.periodStart());
-        assertEquals(LocalDate.of(2026, 7, 27), schedule.periodEndExclusive());
-        assertEquals(Instant.parse("2026-07-26T11:00:00Z"), schedule.dueAt());
+        assertEquals(LocalDate.of(2026, 8, 17), first.periodStart());
+        assertEquals(LocalDate.of(2026, 8, 31), first.periodEndExclusive());
+        assertEquals(Instant.parse("2026-08-24T11:00:00Z"), first.dueAt());
+        assertEquals(LocalDate.of(2026, 8, 31), next.periodStart());
+        assertEquals(Instant.parse("2026-09-07T11:00:00Z"), next.dueAt());
     }
 
     private Context context(String zoneId, DayOfWeek weekStart) {

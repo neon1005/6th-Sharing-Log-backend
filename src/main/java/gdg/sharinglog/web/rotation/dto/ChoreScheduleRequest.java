@@ -17,16 +17,16 @@ public record ChoreScheduleRequest(
         LocalTime dueTime,
 
         DayOfWeek weeklyDueDay,
-        LocalDate biweeklyAnchorDate
+        LocalDate biweeklyDueDate
 ) {
 
     @JsonIgnore
     @AssertTrue(message = "반복 주기에 맞는 일정 필드를 설정해야 합니다.")
     public boolean isFrequencySpecificFieldsValid() {
         return frequency == null || switch (frequency) {
-            case DAILY -> weeklyDueDay == null && biweeklyAnchorDate == null;
-            case WEEKLY -> weeklyDueDay != null && biweeklyAnchorDate == null;
-            case BIWEEKLY -> weeklyDueDay == null && biweeklyAnchorDate != null;
+            case DAILY -> weeklyDueDay == null && biweeklyDueDate == null;
+            case WEEKLY -> weeklyDueDay != null && biweeklyDueDate == null;
+            case BIWEEKLY -> weeklyDueDay == null && biweeklyDueDate != null;
         };
     }
 }

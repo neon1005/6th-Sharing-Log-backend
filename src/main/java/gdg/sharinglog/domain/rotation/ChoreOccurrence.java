@@ -168,18 +168,30 @@ public class ChoreOccurrence {
         }
         if (frequencySnapshot == ChoreFrequency.BIWEEKLY) {
             long daysFromAnchor = ChronoUnit.DAYS.between(
-                    chore.getBiweeklyAnchorDate(),
+                    firstBiweeklyPeriodStart(),
                     periodStart
             );
             if (Math.floorMod(daysFromAnchor, 14) != 0) {
-                throw new IllegalArgumentException("격주 회차는 기준일의 14일 경계에 시작해야 합니다.");
+                throw new IllegalArgumentException("격주 회차는 첫 마감일 기준 14일 경계에 시작해야 합니다.");
             }
         }
 
         ZoneId zoneId = ZoneId.of(timeZoneIdSnapshot);
         LocalDate expectedDueDate = switch (frequencySnapshot) {
             case DAILY -> periodStart;
-            case BIWEEKLY -> periodEndExclusive.minusDays(1);
+            case BIWEEKLY -> {
+                LocalDate candidateDueDate = periodStart.plusDays(Math.floorMod(
+                        ChronoUnit.DAYS.between(
+                                periodStart,
+                                chore.getBiweeklyDueDate()
+                        ),
+                        14L
+                ));
+                if (candidateDueDate.isBefore(chore.getBiweeklyDueDate())) {
+                    throw new IllegalArgumentException("격주 회차는 첫 마감일보다 앞설 수 없습니다.");
+                }
+                yield candidateDueDate;
+            }
             case WEEKLY -> periodStart.plusDays(Math.floorMod(
                     chore.getWeeklyDueDay().getValue()
                             - chore.getGroup().getWeekStartsOn().getValue(),
@@ -193,6 +205,16 @@ public class ChoreOccurrence {
         if (!dueAt.equals(expectedDueAt)) {
             throw new IllegalArgumentException("마감 시각이 업무 반복 규칙과 일치하지 않습니다.");
         }
+    }
+
+    private LocalDate firstBiweeklyPeriodStart() {
+        LocalDate firstDueDate = chore.getBiweeklyDueDate();
+        int daysSinceWeekStart = Math.floorMod(
+                firstDueDate.getDayOfWeek().getValue()
+                        - chore.getGroup().getWeekStartsOn().getValue(),
+                7
+        );
+        return firstDueDate.minusDays(daysSinceWeekStart).minusWeeks(1);
     }
 
     public static ChoreOccurrence create(

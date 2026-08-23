@@ -3,6 +3,7 @@ package gdg.sharinglog.web.rotation.dto;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,7 +12,7 @@ import org.junit.jupiter.api.Test;
 
 class UpdateChoreRequestTest {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
     @Test
     void deserializesEligibilityInsteadOfIgnoringIt() throws Exception {
@@ -33,5 +34,23 @@ class UpdateChoreRequestTest {
         assertTrue(request.isChangePresent());
         assertEquals(ChoreEligibilityMode.SELECTED_MEMBERS, request.eligibility().mode());
         assertEquals(List.of(firstId, secondId), request.eligibility().membershipIds());
+    }
+
+    @Test
+    void deserializesBiweeklyDueDateAsTheScheduleDeadline() throws Exception {
+        UpdateChoreRequest request = objectMapper.readValue("""
+                {
+                  "schedule": {
+                    "frequency": "BIWEEKLY",
+                    "dueTime": "20:00:00",
+                    "weeklyDueDay": null,
+                    "biweeklyDueDate": "2026-08-24"
+                  }
+                }
+                """, UpdateChoreRequest.class);
+
+        assertTrue(request.isChangePresent());
+        assertEquals(LocalDate.of(2026, 8, 24), request.schedule().biweeklyDueDate());
+        assertTrue(request.schedule().isFrequencySpecificFieldsValid());
     }
 }

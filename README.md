@@ -82,8 +82,7 @@
 - Swagger
 
 ## 배포 링크
-- 프론트엔드: [https://6th-sharing-log-frontend-teal.vercel.app](https://6th-sharing-log-frontend-teal.vercel.app)
-- 백엔드: [https://sharinglog-43-200-12-73.sslip.io](https://sharinglog-43-200-12-73.sslip.io)
+- 링크: [https://6th-sharing-log-frontend-teal.vercel.app](https://6th-sharing-log-frontend-teal.vercel.app)
 - API 문서 (Swagger UI): [https://sharinglog-43-200-12-73.sslip.io/swagger-ui/index.html](https://sharinglog-43-200-12-73.sslip.io/swagger-ui/index.html)
 
 ## 프로젝트 구조
